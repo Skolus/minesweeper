@@ -93,10 +93,13 @@
 
         /* Minesweeper Styling */
         #minesweeper-board {
+            --ms-cell-size: 44px;
+            --ms-gap: 3px;
             user-select: none;
+            touch-action: manipulation;
             margin: 0 auto;
             display: inline-grid;
-            gap: 3px;
+            gap: var(--ms-gap);
             background: var(--board-bg);
             padding: 12px;
             border-radius: 10px;
@@ -104,8 +107,8 @@
         }
         .ms-cell {
             box-sizing: border-box;
-            width: 44px;
-            height: 44px;
+            width: var(--ms-cell-size);
+            height: var(--ms-cell-size);
             background-color: var(--cell-bg);
             border: 1px solid var(--cell-border);
             border-radius: 5px;
@@ -113,12 +116,14 @@
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: 1.3rem;
+            font-size: calc(var(--ms-cell-size) * 0.44);
             font-family: 'JetBrains Mono', monospace;
             color: var(--text-color);
             cursor: pointer;
             transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.15s ease;
             user-select: none;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
         }
         .ms-cell:hover:not(.revealed):not(.flagged) {
             transform: translateY(-1px);
@@ -157,7 +162,7 @@
             80% { opacity: 1; transform: translateY(0) scale(1); }
             100% { opacity: 0; transform: translateY(0) scale(0.8); }
         }
-        .ms-cell img { width: 32px; height: 32px; image-rendering: pixelated; }
+        .ms-cell img { width: calc(var(--ms-cell-size) * 0.73); height: calc(var(--ms-cell-size) * 0.73); image-rendering: pixelated; }
         .ms-cell.revealed[data-mines="1"] { color: #8fb8ff; }
         .ms-cell.revealed[data-mines="2"] { color: #7fe8c8; }
         .ms-cell.revealed[data-mines="3"] { color: #ff9d9d; }
@@ -902,11 +907,48 @@ function toggleCustomMinesweeper() {
     }
 }
 
+function fitMSBoard() {
+    const boardEl = document.getElementById('minesweeper-board');
+    if (!boardEl || !msCols) return;
+
+    const BASE_CELL = 44;
+    const MIN_CELL = 16;
+    const BOARD_PADDING = 24; // 12px padding on each side
+    const GAP = 3;
+
+    // Available width is whatever the board's containing block can offer.
+    const wrapper = boardEl.parentElement;
+    const availableWidth = (wrapper ? wrapper.clientWidth : window.innerWidth) - 4; // small safety margin
+
+    const totalGapCols = GAP * (msCols - 1);
+    const maxCellFromWidth = Math.floor((availableWidth - BOARD_PADDING - totalGapCols) / msCols);
+
+    // Available height: viewport height minus whatever sits above the board
+    // and a reserve for the UI below it (stats grid, footer, etc).
+    const boardTop = wrapper ? wrapper.getBoundingClientRect().top : 0;
+    const BOTTOM_RESERVE = 200;
+    const availableHeight = window.innerHeight - boardTop - BOTTOM_RESERVE;
+
+    const totalGapRows = GAP * (msRows - 1);
+    const maxCellFromHeight = Math.floor((availableHeight - BOARD_PADDING - totalGapRows) / msRows);
+
+    const cellSize = Math.max(MIN_CELL, Math.min(BASE_CELL, maxCellFromWidth, maxCellFromHeight));
+
+    boardEl.style.setProperty('--ms-cell-size', `${cellSize}px`);
+    boardEl.style.gridTemplateColumns = `repeat(${msCols}, var(--ms-cell-size))`;
+    boardEl.style.width = 'min-content';
+}
+
+window.addEventListener('resize', () => {
+    if (typeof msCols !== 'undefined' && document.getElementById('minesweeper-board').children.length) {
+        fitMSBoard();
+    }
+});
+
 function initMSBoard() {
     const boardEl = document.getElementById('minesweeper-board');
     boardEl.innerHTML = '';
-    boardEl.style.gridTemplateColumns = `repeat(${msCols}, 48px)`;
-    boardEl.style.width = 'min-content';
+    fitMSBoard();
     msBoard = [];
     msSelectedCell = null;
 
@@ -930,6 +972,53 @@ function initMSBoard() {
                 e.preventDefault();
                 handleMSRightClick(r, c);
             };
+
+            // Touch support: tap reveals, tap-and-hold flags, and we
+            // suppress the synthetic mouse/click events + double-tap zoom.
+            let touchTimer = null;
+            let touchMoved = false;
+            let longPressFired = false;
+            const LONG_PRESS_MS = 400;
+            const MOVE_CANCEL_PX = 10;
+            let touchStartX = 0, touchStartY = 0;
+
+            cellEl.addEventListener('touchstart', (e) => {
+                touchMoved = false;
+                longPressFired = false;
+                const t = e.touches[0];
+                touchStartX = t.clientX;
+                touchStartY = t.clientY;
+
+                touchTimer = setTimeout(() => {
+                    longPressFired = true;
+                    if (navigator.vibrate) navigator.vibrate(15);
+                    handleMSRightClick(r, c);
+                }, LONG_PRESS_MS);
+            }, { passive: true });
+
+            cellEl.addEventListener('touchmove', (e) => {
+                const t = e.touches[0];
+                if (Math.abs(t.clientX - touchStartX) > MOVE_CANCEL_PX ||
+                    Math.abs(t.clientY - touchStartY) > MOVE_CANCEL_PX) {
+                    touchMoved = true;
+                    clearTimeout(touchTimer);
+                }
+            }, { passive: true });
+
+            cellEl.addEventListener('touchend', (e) => {
+                clearTimeout(touchTimer);
+                // Prevent the browser from firing a synthetic mousedown/click
+                // (which would double-trigger the action) and from treating
+                // this as part of a double-tap-to-zoom gesture.
+                e.preventDefault();
+                if (!touchMoved && !longPressFired) {
+                    handleMSClick(r, c);
+                }
+            });
+
+            cellEl.addEventListener('touchcancel', () => {
+                clearTimeout(touchTimer);
+            });
 
             cellEl.onmouseenter = () => {
                 msHoveredCell = { r, c };
