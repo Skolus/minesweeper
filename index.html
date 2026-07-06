@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Minesweeper with adjustable board size, mine density, stats viewer, chording, and keyboard support.">
+    <title>Minesweeper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <style>
+        /* ============================================
+           skolus.github.io theme — lo-fi rain / violet
+           ============================================ */
+        html, body {
+            overflow: auto;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-color: #08070c;
+            --bg-void: #050408;
+            --text-color: #e9e5f7;
+            --text-dim: #8b84a8;
+            --board-bg: #0d0b14;
+            --cell-bg: #14121f;
+            --cell-hover: #1c1830;
+            --cell-revealed: #0a0910;
+            --cell-border: rgba(164, 143, 255, 0.10);
+            --button-bg: #1a1628;
+            --button-hover: #251f3d;
+            --card-bg: #0c0a13;
+            --input-bg: #120f1c;
+            --input-border: rgba(164, 143, 255, 0.16);
+            --purple: #a48fff;
+            --purple-dim: #6f5aad;
+            --purple-glow: rgba(164, 143, 255, 0.35);
+            --danger: #ff7aa8;
+            --success: #7fe8c8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            background: var(--bg-color);
+            position: relative;
+        }
+
+        /* ---- rain canvas background ---- */
+        #rainCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            pointer-events: none;
+            background: radial-gradient(circle at 50% 0%, #0d0a17 0%, var(--bg-void) 70%);
+        }
+        #vignette {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%);
+        }
+
+        /* ---- top nav ---- */
+        .site-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px 20px 0;
+            font-size: 13px;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+        .site-nav a {
+            color: var(--text-dim);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        .site-nav a:hover { color: var(--purple); }
+        .site-title {
+            color: var(--purple);
+            text-shadow: 0 0 12px var(--purple-glow);
+            letter-spacing: 0.08em;
+        }
+
+        /* Minesweeper Styling */
+        #minesweeper-board {
+            user-select: none;
+            margin: 0 auto;
+            display: inline-grid;
+            gap: 3px;
+            background: var(--board-bg);
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: inset 0 0 0 1px rgba(164,143,255,0.06), 0 20px 50px rgba(0,0,0,0.5), 0 0 40px rgba(120,90,220,0.05);
+        }
+        .ms-cell {
+            box-sizing: border-box;
+            width: 44px;
+            height: 44px;
+            background-color: var(--cell-bg);
+            border: 1px solid var(--cell-border);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.3rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.15s ease;
+            user-select: none;
+        }
+        .ms-cell:hover:not(.revealed):not(.flagged) {
+            transform: translateY(-1px);
+            background-color: var(--cell-hover);
+            box-shadow: 0 0 0 1px var(--purple-glow), 0 4px 12px rgba(164,143,255,0.12);
+        }
+        .ms-cell.revealed {
+            border-color: var(--cell-border);
+            background-color: var(--cell-revealed);
+            cursor: default;
+            box-shadow: none;
+        }
+        .ms-cell.flagged {
+            background-color: var(--cell-bg);
+            color: transparent;
+        }
+        .ms-cell.flagged.text-mode {
+            color: var(--text-color);
+        }
+        .ms-cell.mine { background-color: #1a0d16; color: var(--danger); }
+
+        /* Score Animation */
+        .score-popup {
+            position: absolute;
+            color: var(--success);
+            font-weight: bold;
+            font-size: 15px;
+            pointer-events: none;
+            z-index: 1001;
+            animation: scorePopup 2s ease-out forwards;
+            text-shadow: 0 0 8px rgba(127,232,200,0.5);
+        }
+        @keyframes scorePopup {
+            0% { opacity: 0; transform: translateY(8px) scale(0.8); }
+            20% { opacity: 1; transform: translateY(0) scale(1); }
+            80% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(0) scale(0.8); }
+        }
+        .ms-cell img { width: 32px; height: 32px; image-rendering: pixelated; }
+        .ms-cell.revealed[data-mines="1"] { color: #8fb8ff; }
+        .ms-cell.revealed[data-mines="2"] { color: #7fe8c8; }
+        .ms-cell.revealed[data-mines="3"] { color: #ff9d9d; }
+        .ms-cell.revealed[data-mines="4"] { color: #b39dff; }
+        .ms-cell.revealed[data-mines="5"] { color: #ff9dd4; }
+        .ms-cell.revealed[data-mines="6"] { color: #7fe0e8; }
+        .ms-cell.revealed[data-mines="7"] { color: #e9e5f7; }
+        .ms-cell.revealed[data-mines="8"] { color: #a89fc4; }
+
+        .ms-cell.text-mode { font-size: 1.4rem; }
+        .ms-cell.text-mode img { display: none; }
+
+        /* Settings Menu */
+        .settings-menu { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .settings-toggle {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.04em;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .settings-toggle:hover {
+            border-color: var(--purple-dim);
+            box-shadow: 0 0 16px rgba(120,90,220,0.15);
+        }
+        .settings-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 4, 8, 0.85);
+            backdrop-filter: blur(2px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 100px;
+        }
+        .settings-overlay.active { display: flex; }
+        .settings-overlay.settings-window {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 60px rgba(120,90,220,0.08);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        .settings-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--input-border);
+            flex-wrap: wrap;
+        }
+        .settings-tab {
+            padding: 8px 14px;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.5;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+        .settings-tab:hover { opacity: 0.85; }
+        .settings-tab.active {
+            border-bottom-color: var(--purple);
+            color: var(--purple);
+            opacity: 1;
+        }
+        .settings-content { display: none; }
+        .settings-content.active { display: block; }
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .settings-item:last-child { margin-bottom: 0; }
+        .settings-item label { color: var(--text-color); font-size: 13px; }
+        .settings-item input[type="checkbox"] { cursor: pointer; accent-color: var(--purple); }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 8px;
+            color: var(--text-dim);
+            font-size: 12px;
+            cursor: help;
+            transition: opacity 0.2s;
+        }
+        .tooltip:hover { color: var(--purple); }
+        .tooltip .tooltip-content {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 10000;
+            bottom: 125%;
+            right: 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid var(--input-border);
+            font-size: 12px;
+            line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .tooltip .tooltip-content.right-edge { left: auto; right: 0; margin-left: 0; }
+        .tooltip .tooltip-content.right-edge::after { left: auto; right: 20px; margin-left: 0; }
+        .tooltip .tooltip-content::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            right: 20px;
+            margin-left: 0;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--input-bg) transparent transparent transparent;
+        }
+        .tooltip:hover .tooltip-content { visibility: visible; opacity: 1; }
+        .settings-item input[type="range"] { width: 120px; cursor: pointer; accent-color: var(--purple); }
+        .keybind-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--input-border); }
+        .keybind-section h4 { color: var(--text-dim); font-size: 13px; margin-bottom: 12px; letter-spacing: 0.04em; }
+        .keybind-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .keybind-item label { color: var(--text-color); font-size: 12px; }
+        .keybind-button {
+            background: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            min-width: 60px;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .keybind-button.recording { background: var(--purple-dim); color: white; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+        .stat-item { background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--input-border); }
+        .stat-label { color: var(--text-dim); font-size: 11px; margin-bottom: 4px; letter-spacing: 0.04em; }
+        .stat-value { color: var(--purple); font-size: 17px; font-weight: bold; }
+
+        .loading-spinner {
+            display: none;
+            position: absolute;
+            top: 10px; right: 10px;
+            width: 22px; height: 22px;
+            border: 3px solid var(--input-border);
+            border-top-color: var(--purple);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-spinner.active { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .ms-cell.selected { outline: 2px solid var(--purple); outline-offset: -2px; }
+
+        /* High Contrast Mode */
+        body.high-contrast {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --board-bg: #000000;
+            --cell-bg: #000000;
+            --cell-hover: #333333;
+            --cell-revealed: #000000;
+            --cell-border: #ffffff;
+            --button-bg: #ffffff;
+            --button-hover: #cccccc;
+            --card-bg: #000000;
+            --input-bg: #000000;
+            --input-border: #ffffff;
+        }
+        body.high-contrast .ms-cell.revealed[data-mines="1"] { color: #00ffff; }
+        body.high-contrast .ms-cell.revealed[data-mines="2"] { color: #00ff00; }
+        body.high-contrast .ms-cell.revealed[data-mines="3"] { color: #ff0000; }
+        body.high-contrast .ms-cell.revealed[data-mines="4"] { color: #ffff00; }
+        body.high-contrast .ms-cell.revealed[data-mines="5"] { color: #ff00ff; }
+        body.high-contrast .ms-cell.revealed[data-mines="6"] { color: #00ffff; }
+        body.high-contrast .ms-cell.revealed[data-mines="7"] { color: #ffffff; }
+        body.high-contrast .ms-cell.revealed[data-mines="8"] { color: #cccccc; }
+        body.high-contrast .ms-cell.mine { background-color: #000000; color: #ff0000; }
+
+        /* Score Edit Modal */
+        .score-modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5,4,8,0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .score-modal.active { display: flex; }
+        .score-modal-content {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--input-border);
+            min-width: 300px;
+        }
+        .score-modal-content h3 { margin-bottom: 16px; color: var(--purple); }
+        .score-modal-content input {
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            font-size: 16px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .score-modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+        .score-modal-buttons button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .score-modal-buttons .cancel { background: var(--input-bg); color: var(--text-color); }
+        .score-modal-buttons .save { background: var(--purple-dim); color: white; }
+
+        .ms-custom-input {
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 8px 10px;
+            text-align: center;
+            -moz-appearance: textfield;
+            appearance: textfield;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .ms-custom-input::-webkit-outer-spin-button,
+        .ms-custom-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .ms-custom-input:focus {
+            outline: none;
+            border-color: var(--purple-dim);
+            box-shadow: 0 0 0 2px var(--purple-glow);
+        }
+        .ms-custom-input.out-of-range {
+            border-color: var(--danger);
+            box-shadow: 0 0 0 2px rgba(255, 122, 168, 0.25);
+        }
+
+        #minesweeper-difficulty {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0 L5 6 L10 0 Z' fill='%23a48fff'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-10" style="background-color: var(--bg-color); color: var(--text-color);">
+
+<canvas id="rainCanvas"></canvas>
+<div id="vignette"></div>
+
+<nav class="site-nav">
+    <a href="https://skolus.github.io" class="site-title">skolus</a>
+</nav>
+
+
+    
+    <div class="settings-menu">
+        <button class="settings-toggle" onclick="toggleSettingsPanel()">Settings</button>
+    </div>
+
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-window">
+            <div class="settings-tabs">
+                <button class="settings-tab active" onclick="switchSettingsTab('general')">General</button>
+                <button class="settings-tab" onclick="switchSettingsTab('audio')">Audio</button>
+                <button class="settings-tab" onclick="switchSettingsTab('keybinds')">Keybinds</button>
+                <button class="settings-tab" onclick="switchSettingsTab('statistics')">Statistics</button>
+                <button class="settings-tab" onclick="switchSettingsTab('debug')">Debug</button>
+                <button class="settings-tab" onclick="switchSettingsTab('about')">About</button>
+            </div>
+
+            <div class="settings-content active" id="settings-general">
+                <div class="settings-item">
+                    <label>Text Mode<span class="tooltip">?<span class="tooltip-content">Turn this off to show custom textures</span></span></label>
+                    <input type="checkbox" id="textMode" onchange="toggleTextMode()">
+                </div>
+                <div class="settings-item">
+                    <label>High Contrast</label>
+                    <input type="checkbox" id="highContrast" onchange="toggleHighContrast()">
+                </div>
+                <div class="settings-item">
+                    <label>Hide Timer</label>
+                    <input type="checkbox" id="hideTimer" onchange="toggleHideTimer()">
+                </div>
+                <div class="settings-item">
+                    <label>Question Marks<span class="tooltip">?<span class="tooltip-content">Right clicking a flagged square will show a question mark</span></span></label>
+                    <input type="checkbox" id="questionMarks" onchange="toggleQuestionMarks()">
+                </div>
+                <div class="settings-item">
+                    <label>Chording<span class="tooltip">?<span class="tooltip-content">Clicking a number which has the appropriate amount of flags next to it will uncover all adjacent squares</span></span></label>
+                    <input type="checkbox" id="chording" onchange="toggleChording()">
+                </div>
+                <div class="settings-item">
+                    <label>Auto Pause<span class="tooltip">?<span class="tooltip-content">Pause the timer while you're tabbed out</span></span></label>
+                    <input type="checkbox" id="autoPause" onchange="toggleAutoPause()">
+                </div>
+                            </div>
+
+            <div class="settings-content" id="settings-audio">
+                <div class="settings-item">
+                    <label>Sound Enabled</label>
+                    <input type="checkbox" id="soundEnabled" onchange="toggleSoundEnabled()">
+                </div>
+                <div class="settings-item">
+                    <label>Reveal Sound</label>
+                    <input type="checkbox" id="soundReveal" onchange="toggleSoundReveal()">
+                </div>
+                <div class="settings-item">
+                    <label>Flag Sound</label>
+                    <input type="checkbox" id="soundFlag" onchange="toggleSoundFlag()">
+                </div>
+                <div class="settings-item">
+                    <label>Explode Sound</label>
+                    <input type="checkbox" id="soundExplode" onchange="toggleSoundExplode()">
+                </div>
+                <div class="settings-item">
+                    <label>Win Sound</label>
+                    <input type="checkbox" id="soundWin" onchange="toggleSoundWin()">
+                </div>
+                <div class="settings-item">
+                    <label>Master Volume</label>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1" onchange="changeVolume(this.value)">
+                </div>
+            </div>
+
+            <div class="settings-content" id="settings-keybinds">
+                <div class="keybind-section">
+                    <h4>Navigation</h4>
+                    <div class="keybind-item">
+                        <label>Move Up</label>
+                        <button class="keybind-button" id="keybind-up" onclick="recordKeybind('up')">ArrowUp</button>
+                    </div>
+                    <div class="keybind-item">
+                        <label>Move Down</label>
+                        <button class="keybind-button" id="keybind-down" onclick="recordKeybind('down')">ArrowDown</button>
+                    </div>
+                    <div class="keybind-item">
+                        <label>Move Left</label>
+                        <button class="keybind-button" id="keybind-left" onclick="recordKeybind('left')">ArrowLeft</button>
+                    </div>
+                    <div class="keybind-item">
+                        <label>Move Right</label>
+                        <button class="keybind-button" id="keybind-right" onclick="recordKeybind('right')">ArrowRight</button>
+                    </div>
+                </div>
+                <div class="keybind-section">
+                    <h4>Actions</h4>
+                    <div class="keybind-item">
+                        <label>Uncover</label>
+                        <button class="keybind-button" id="keybind-uncover" onclick="recordKeybind('uncover')">1</button>
+                    </div>
+                    <div class="keybind-item">
+                        <label>Flag</label>
+                        <button class="keybind-button" id="keybind-flag" onclick="recordKeybind('flag')">3</button>
+                    </div>
+                    <div class="keybind-item">
+                        <label>Deselect</label>
+                        <button class="keybind-button" id="keybind-deselect" onclick="recordKeybind('deselect')">Escape</button>
+                    </div>
+                    <div class="keybind-item">
+                        <label>Reset</label>
+                        <button class="keybind-button" id="keybind-reset" onclick="recordKeybind('reset')"> </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-content" id="settings-statistics">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Games Played</div>
+                        <div class="stat-value" id="stat-gamesPlayed">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Games Won</div>
+                        <div class="stat-value" id="stat-gamesWon">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Win Rate</div>
+                        <div class="stat-value" id="stat-winRate">0%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Current Streak</div>
+                        <div class="stat-value" id="stat-currentStreak">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Best Streak</div>
+                        <div class="stat-value" id="stat-bestStreak">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Average Time</div>
+                        <div class="stat-value" id="stat-avgTime">0s</div>
+                    </div>
+                </div>
+                <div class="settings-item" style="margin-top: 20px;">
+                    <button onclick="resetStatistics()" style="background: #6b3050; color: white; padding: 8px 16px; border: 1px solid var(--input-border); border-radius: 6px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 13px;">reset statistics</button>
+                </div>
+            </div>
+
+            <div class="settings-content" id="settings-debug">
+                <div class="settings-item">
+                    <label>View Mines</label>
+                    <input type="checkbox" id="viewMines" onchange="toggleViewMines()">
+                </div>
+                <div class="settings-item">
+                    <button onclick="showScoreAnimation(30, () => animateScoreUpdate(msTotalScore, msTotalScore + 30))" style="background: var(--button-bg); color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Test Score</button>
+                </div>
+            </div>
+            <div class="settings-content" id="settings-about">
+                <div class="text-center" style="padding: 8px 0 4px;">
+                    <a href="https://skolus.github.io" target="_blank" rel="noopener" style="color: var(--purple); font-size: 14px; text-decoration: none; letter-spacing: 0.04em;">my site</a>
+                    <div style="color: var(--text-dim); font-size: 12px; margin-top: 10px; letter-spacing: 0.04em;">made by skolus</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="score-modal" id="scoreModal">
+        <div class="score-modal-content">
+            <h3>Edit Score</h3>
+            <input type="number" id="scoreInput" value="0">
+            <div class="score-modal-buttons">
+                <button class="cancel" onclick="closeScoreModal()">Cancel</button>
+                <button class="save" onclick="saveScore()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// ============================================
+// Ambient rain background — matches skolus.github.io
+// ============================================
+(function () {
+    const canvas = document.getElementById('rainCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let drops = [];
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const count = Math.floor((canvas.width * canvas.height) / 9000);
+        drops = new Array(count).fill(null).map(() => makeDrop());
+    }
+
+    function makeDrop() {
+        return {
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            len: 10 + Math.random() * 22,
+            speed: 3 + Math.random() * 6,
+            drift: -0.4 + Math.random() * 0.8,
+            alpha: 0.05 + Math.random() * 0.16
+        };
+    }
+
+    function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(164,143,255,1)';
+        ctx.lineCap = 'round';
+        for (const d of drops) {
+            ctx.globalAlpha = d.alpha;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(d.x, d.y);
+            ctx.lineTo(d.x + d.drift * 3, d.y + d.len);
+            ctx.stroke();
+
+            d.x += d.drift;
+            d.y += d.speed;
+            if (d.y > canvas.height) {
+                d.y = -d.len;
+                d.x = Math.random() * canvas.width;
+            }
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(tick);
+})();
+    </script>
+
+    <script>
+let msTotalScore = parseInt(localStorage.getItem('msTotalScore')) || 0;
+let msTextMode = localStorage.getItem('msTextMode') !== 'false'; // Default on
+let msVolume = parseFloat(localStorage.getItem('msVolume')) || 0.5;
+let msHighContrast = localStorage.getItem('msHighContrast') === 'true';
+let msHideTimer = localStorage.getItem('msHideTimer') === 'true';
+let msQuestionMarks = localStorage.getItem('msQuestionMarks') === 'true';
+let msChording = localStorage.getItem('msChording') !== 'false'; // Default on
+let msAutoPause = localStorage.getItem('msAutoPause') !== 'false'; // Default on
+
+// Sound settings
+let msSoundEnabled = localStorage.getItem('msSoundEnabled') !== 'false'; // Default on
+let msSoundReveal = localStorage.getItem('msSoundReveal') !== 'false';
+let msSoundFlag = localStorage.getItem('msSoundFlag') !== 'false';
+let msSoundExplode = localStorage.getItem('msSoundExplode') !== 'false';
+let msSoundWin = localStorage.getItem('msSoundWin') !== 'false';
+
+// Statistics
+let msStats = JSON.parse(localStorage.getItem('msStats')) || {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    totalTime: 0,
+    bestTime: null,
+    currentStreak: 0,
+    bestStreak: 0
+};
+
+// Debug settings
+let msViewMines = localStorage.getItem('msViewMines') === 'true';
+let msSelectedCell = null;
+let msKeybinds = JSON.parse(localStorage.getItem('msKeybinds')) || {
+    up: 'ArrowUp',
+    down: 'ArrowDown',
+    left: 'ArrowLeft',
+    right: 'ArrowRight',
+    uncover: '1',
+    flag: '3',
+    deselect: 'Escape',
+    reset: ' '
+};
+
+// Migrate old array keybinds to single strings
+let migrated = false;
+Object.keys(msKeybinds).forEach(key => {
+    if (Array.isArray(msKeybinds[key])) {
+        msKeybinds[key] = msKeybinds[key][0];
+        migrated = true;
+    }
+});
+if (migrated) {
+    localStorage.setItem('msKeybinds', JSON.stringify(msKeybinds));
+}
+let msRecordingKeybind = null;
+let msModifierPressed = false;
+let msHoveredCell = null;
+let msBoard = [];
+let msRows = 8, msCols = 8, msMinesCount = 10;
+let msGameOver = false;
+let msFirstClick = true;
+let msTimerInterval;
+let msStartTime = 0;
+let msFinalTime = 0;
+let msFlagsCount = 0;
+let msViewMinesUsed = false; // Track if View Mines was ever enabled during this game
+let msIsPaused = false;
+let msElapsedBeforePause = 0; // Time elapsed before pause
+let msWasAutoPaused = false; // Track if game was auto-paused
+let msReplayData = []; // Store all moves for replay
+let msIsReplaying = false; // Track if currently replaying
+document.addEventListener('DOMContentLoaded', () => {
+    updateBestTimesDisplay();
+    // Load settings FIRST
+    document.getElementById('textMode').checked = msTextMode;
+    document.getElementById('volumeSlider').value = msVolume;
+    document.getElementById('highContrast').checked = msHighContrast;
+    document.getElementById('hideTimer').checked = msHideTimer;
+    document.getElementById('questionMarks').checked = msQuestionMarks;
+    document.getElementById('chording').checked = msChording;
+    document.getElementById('autoPause').checked = msAutoPause;
+        
+    // Audio settings
+    document.getElementById('soundEnabled').checked = msSoundEnabled;
+    document.getElementById('soundReveal').checked = msSoundReveal;
+    document.getElementById('soundFlag').checked = msSoundFlag;
+    document.getElementById('soundExplode').checked = msSoundExplode;
+    document.getElementById('soundWin').checked = msSoundWin;
+    
+    // Debug settings
+    document.getElementById('viewMines').checked = msViewMines;
+    
+    // Check if custom difficulty is selected and show panel
+    toggleCustomMinesweeper();
+    
+    // NOW start the game after settings are loaded
+    startMinesweeper();
+    
+    // Update statistics display
+    updateStatisticsDisplay();
+    
+    // Apply settings
+    if (msHighContrast) document.body.classList.add('high-contrast');
+    if (msHideTimer) document.getElementById('timer-container').style.display = 'none';
+    // Load keybinds
+    Object.keys(msKeybinds).forEach(key => {
+        const btn = document.getElementById(`keybind-${key}`);
+        if (btn) {
+            let displayText = msKeybinds[key];
+            if (displayText === ' ') displayText = 'Space';
+            btn.innerText = displayText;
+        }
+    });
+    // Master volume is applied directly to the synth gain node when audio starts
+});
+
+function startMinesweeper() {
+    const diff = document.getElementById('minesweeper-difficulty').value;
+    const settings = getMinesweeperSettings(diff);
+
+    // (no lingering audio elements to stop — synth sounds are one-shot)
+
+    msRows = settings.rows;
+    msCols = settings.cols;
+    msMinesCount = settings.mines;
+
+    document.getElementById('minesweeper-total-score').innerText = msTotalScore;
+
+    msGameOver = false;
+    msFirstClick = true;
+    msFinalTime = 0;
+    msFlagsCount = msMinesCount;
+    msIsPaused = false;
+    msElapsedBeforePause = 0;
+    msWasAutoPaused = false;
+    msReplayData = [];
+    msIsReplaying = false;
+    
+    // Check if View Mines is already enabled when game starts
+    msViewMinesUsed = msViewMines;
+    
+    // Reset pause button
+    const pauseButton = document.getElementById('pauseButton');
+    pauseButton.style.display = 'none';
+    pauseButton.textContent = 'Pause';
+    pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors';
+    
+    // Reset pause overlay
+    document.getElementById('pauseOverlay').style.display = 'none';
+    
+    // Reset board visibility
+    const board = document.getElementById('minesweeper-board');
+    board.style.opacity = '1';
+    board.style.pointerEvents = 'auto';
+    
+    clearInterval(msTimerInterval);
+
+    document.getElementById('minesweeper-timer').innerText = "0";
+    document.getElementById('minesweeper-flags').innerText = msFlagsCount;
+    const status = document.getElementById('minesweeper-status');
+    status.innerText = "";
+    status.className = "text-center mt-4 font-bold text-lg";
+
+    initMSBoard();
+}
+
+// Load best times on startup
+function updateBestTimesDisplay() {
+    const bestTimes = JSON.parse(localStorage.getItem('msBestTimes')) || { easy: null, medium: null, hard: null };
+    document.getElementById('best-easy').innerText = bestTimes.easy ? bestTimes.easy.toFixed(2) + 's' : '--';
+    document.getElementById('best-medium').innerText = bestTimes.medium ? bestTimes.medium.toFixed(2) + 's' : '--';
+    document.getElementById('best-hard').innerText = bestTimes.hard ? bestTimes.hard.toFixed(2) + 's' : '--';
+}
+
+function saveBestTime(difficulty, time) {
+    // We only track best times for standard difficulties, not 'custom'
+    if (difficulty === 'custom') return;
+
+    const bestTimes = JSON.parse(localStorage.getItem('msBestTimes')) || { easy: null, medium: null, hard: null };
+    
+    // If no best time exists or the current time is faster, update it
+    if (bestTimes[difficulty] === null || time < bestTimes[difficulty]) {
+        bestTimes[difficulty] = time;
+        localStorage.setItem('msBestTimes', JSON.stringify(bestTimes));
+        updateBestTimesDisplay();
+        return true; // New record!
+    }
+    return false;
+}
+
+
+
+function getMinesweeperSettings(diff) {
+    if (diff === 'easy') return { rows: 8, cols: 8, mines: 10 };
+    if (diff === 'medium') return { rows: 12, cols: 12, mines: 20 };
+    if (diff === 'hard') return { rows: 16, cols: 16, mines: 40 };
+
+    const rows = parseInt(document.getElementById('minesweeper-custom-rows').value, 10) || 10;
+    const cols = parseInt(document.getElementById('minesweeper-custom-cols').value, 10) || 10;
+    let mines = parseInt(document.getElementById('minesweeper-custom-mines').value, 10);
+
+    const safeRows = Math.min(Math.max(rows, 4), 30);
+    const safeCols = Math.min(Math.max(cols, 4), 30);
+    const maxMines = Math.max(1, Math.min(safeRows * safeCols - 1, mines || Math.floor(safeRows * safeCols * 0.12)));
+
+    document.getElementById('minesweeper-custom-rows').value = safeRows;
+    document.getElementById('minesweeper-custom-cols').value = safeCols;
+    document.getElementById('minesweeper-custom-mines').value = maxMines;
+
+    return { rows: safeRows, cols: safeCols, mines: maxMines };
+}
+
+function toggleCustomMinesweeper() {
+    const customPanel = document.getElementById('minesweeper-custom-panel');
+    const suggestionContainer = document.getElementById('mine-suggestion-container');
+    if (document.getElementById('minesweeper-difficulty').value === 'custom') {
+        customPanel.style.display = 'flex';
+        suggestionContainer.style.display = 'block';
+        updateMineSuggestion(); // Update suggestion when showing
+    } else {
+        customPanel.style.display = 'none';
+        suggestionContainer.style.display = 'none';
+    }
+}
+
+function initMSBoard() {
+    const boardEl = document.getElementById('minesweeper-board');
+    boardEl.innerHTML = '';
+    boardEl.style.gridTemplateColumns = `repeat(${msCols}, 48px)`;
+    boardEl.style.width = 'min-content';
+    msBoard = [];
+    msSelectedCell = null;
+
+    boardEl.oncontextmenu = (e) => e.preventDefault();
+
+    for (let r = 0; r < msRows; r++) {
+        msBoard[r] = [];
+        for (let c = 0; c < msCols; c++) {
+            const cellEl = document.createElement('div');
+            cellEl.className = 'ms-cell';
+            cellEl.id = `ms-${r}-${c}`;
+            cellEl.dataset.mines = '0';
+
+            cellEl.onmousedown = (e) => {
+                if (e.button === 0) {
+                    handleMSClick(r, c);
+                }
+            };
+
+            cellEl.oncontextmenu = (e) => {
+                e.preventDefault();
+                handleMSRightClick(r, c);
+            };
+
+            cellEl.onmouseenter = () => {
+                msHoveredCell = { r, c };
+            };
+
+            cellEl.onmouseleave = () => {
+                msHoveredCell = null;
+            };
+
+            boardEl.appendChild(cellEl);
+            msBoard[r][c] = { mine: false, revealed: false, flagged: false, questioned: false, neighbors: 0 };
+        }
+    }
+}
+
+function selectCell(r, c) {
+    if (msSelectedCell) {
+        const oldEl = document.getElementById(`ms-${msSelectedCell.r}-${msSelectedCell.c}`);
+        if (oldEl) oldEl.classList.remove('selected');
+    }
+    msSelectedCell = { r, c };
+    const newEl = document.getElementById(`ms-${r}-${c}`);
+    if (newEl) newEl.classList.add('selected');
+}
+
+function handleMSClick(r, c) {
+    if (msGameOver || msIsPaused || msBoard[r][c].flagged || msBoard[r][c].questioned) return;
+    
+        
+    // Allow clicking on revealed cells for chording, but only if they have neighbors
+    if (msBoard[r][c].revealed && msBoard[r][c].neighbors === 0) return;
+
+    if (msFirstClick) {
+        document.getElementById('loadingSpinner').classList.add('active');
+        msFirstClick = false;
+        
+        // 1. Capture physical start time IMMEDIATELY on click
+        msStartTime = Date.now(); 
+
+        setTimeout(() => {
+            placeMines(r, c);
+            startMSTimer();
+            msBeginRevealBatch();
+            revealCell(r, c);
+            msEndRevealBatch();
+            document.getElementById('loadingSpinner').classList.remove('active');
+            // Show pause button when game starts
+            document.getElementById('pauseButton').style.display = 'block';
+        }, 10);
+        return;
+    }
+
+    // Check for chording
+    if (msChording && msBoard[r][c].revealed && msBoard[r][c].neighbors > 0) {
+        const neighbors = getNeighbors(r, c);
+        const flaggedCount = neighbors.filter(n => msBoard[n.r][n.c].flagged).length;
+        
+        console.log(`Chording check: cell (${r},${c}) has ${msBoard[r][c].neighbors} neighbors, ${flaggedCount} flags`);
+        
+        if (flaggedCount === msBoard[r][c].neighbors) {
+            console.log(`Chording activated! Revealing ${neighbors.length} neighbors`);
+            // Reveal all unflagged neighbors — batched as one action so the
+            // whole chord plays a single sound rather than one per cell
+            msBeginRevealBatch();
+            neighbors.forEach(n => {
+                if (!msBoard[n.r][n.c].flagged && !msBoard[n.r][n.c].revealed) {
+                    console.log(`Revealing neighbor (${n.r},${n.c})`);
+                    handleMSClick(n.r, n.c);
+                }
+            });
+            msEndRevealBatch();
+            return; // Don't proceed to normal reveal
+        } else {
+            console.log(`Chording not activated: ${flaggedCount} flags != ${msBoard[r][c].neighbors} neighbors`);
+        }
+    }
+
+    msBeginRevealBatch();
+    revealCell(r, c);
+    msEndRevealBatch();
+}
+
+function getNeighbors(r, c) {
+    const neighbors = [];
+    for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < msRows && nc >= 0 && nc < msCols) {
+                neighbors.push({ r: nr, c: nc });
+            }
+        }
+    }
+    return neighbors;
+}
+
+function placeMines(safeR, safeC) {
+    let attempts = 0;
+    let solvable = false;
+    const genStartTime = performance.now();
+
+    while (!solvable && attempts < 100) {
+        attempts++;
+        
+        // IMPORTANT: Clear the board from the previous failed attempt
+        for (let r = 0; r < msRows; r++) {
+            for (let c = 0; c < msCols; c++) {
+                msBoard[r][c].mine = false;
+                msBoard[r][c].neighbors = 0;
+            }
+        }
+
+        // Randomly place mines
+        let minesPlaced = 0;
+        while (minesPlaced < msMinesCount) {
+            const r = Math.floor(Math.random() * msRows);
+            const c = Math.floor(Math.random() * msCols);
+            const isSafeZone = Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1;
+
+            if (!msBoard[r][c].mine && !isSafeZone) {
+                msBoard[r][c].mine = true;
+                minesPlaced++;
+            }
+        }
+
+        // Calculate neighbor counts
+        for (let r = 0; r < msRows; r++) {
+            for (let c = 0; c < msCols; c++) {
+                if (!msBoard[r][c].mine) {
+                    let count = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (msBoard[r + dr] && msBoard[r + dr][c + dc]?.mine) count++;
+                        }
+                    }
+                    msBoard[r][c].neighbors = count;
+                }
+            }
+        }
+
+        // Run the logic solver
+        solvable = checkSolvability(safeR, safeC);
+        
+        if (!solvable) {
+            console.log(`Attempt ${attempts}: Board discarded (Required a guess).`);
+        }
+    }
+
+    const genDuration = (performance.now() - genStartTime).toFixed(2);
+    console.log(`%c✅ Solvable board found in ${attempts} attempts! (${genDuration}ms)`, "color: green; font-weight: bold;");
+    
+    // Apply mine visibility after generating new board
+    updateMineVisibility();
+}
+
+function checkSolvability(startR, startC) {
+    let vRevealed = Array.from({ length: msRows }, () => Array(msCols).fill(false));
+    let vFlagged = Array.from({ length: msRows }, () => Array(msCols).fill(false));
+    
+    const vCascade = (r, c) => {
+        if (r < 0 || r >= msRows || c < 0 || c >= msCols || vRevealed[r][c]) return;
+        vRevealed[r][c] = true;
+        if (msBoard[r][c].neighbors === 0) {
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) vCascade(r + dr, c + dc);
+            }
+        }
+    };
+
+    vCascade(startR, startC);
+
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (let r = 0; r < msRows; r++) {
+            for (let c = 0; c < msCols; c++) {
+                if (!vRevealed[r][c] || msBoard[r][c].neighbors === 0) continue;
+
+                let neighbors = [];
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < msRows && nc >= 0 && nc < msCols && (dr !== 0 || dc !== 0)) {
+                            neighbors.push({ r: nr, c: nc });
+                        }
+                    }
+                }
+
+                let hidden = neighbors.filter(n => !vRevealed[n.r][n.c]);
+                let flags = neighbors.filter(n => vFlagged[n.r][n.c]);
+                let unflaggedHidden = hidden.filter(n => !vFlagged[n.r][n.c]);
+
+                if (unflaggedHidden.length === 0) continue;
+
+                // Rule: All remaining hidden are mines
+                if (msBoard[r][c].neighbors === hidden.length) {
+                    unflaggedHidden.forEach(n => { vFlagged[n.r][n.c] = true; changed = true; });
+                }
+                // Rule: All remaining hidden are safe
+                if (msBoard[r][c].neighbors === flags.length) {
+                    unflaggedHidden.forEach(n => { vCascade(n.r, n.c); changed = true; });
+                }
+            }
+        }
+    }
+
+    let totalRevealed = 0;
+    for (let r = 0; r < msRows; r++) {
+        for (let c = 0; c < msCols; c++) { if (vRevealed[r][c]) totalRevealed++; }
+    }
+    return totalRevealed === (msRows * msCols) - msMinesCount;
+}
+
+// Tracks cells revealed within a single user action (a click, or a chord),
+// so a big flood-fill plays one nice "cascade" sound instead of dozens of
+// stacked reveal blips.
+let msRevealBatchDepth = 0;
+let msRevealBatchCount = 0;
+
+function msBeginRevealBatch() {
+    msRevealBatchDepth++;
+}
+
+function msEndRevealBatch() {
+    msRevealBatchDepth = Math.max(0, msRevealBatchDepth - 1);
+    if (msRevealBatchDepth === 0) {
+        if (msRevealBatchCount === 1) {
+            playMSAudio('snd-reveal');
+        } else if (msRevealBatchCount > 1) {
+            playMSAudio('snd-cascade');
+        }
+        msRevealBatchCount = 0;
+    }
+}
+
+function revealCell(r, c) {
+    if (r < 0 || r >= msRows || c < 0 || c >= msCols) return;
+    const cell = msBoard[r][c];
+    if (cell.revealed || cell.flagged) return;
+
+    cell.revealed = true;
+    const el = document.getElementById(`ms-${r}-${c}`);
+    el.classList.add('revealed');
+    el.classList.remove('flagged');
+    el.dataset.mines = cell.neighbors;
+
+    if (cell.mine) {
+        playMSAudio('snd-explode'); 
+        el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
+        if (msTextMode) el.classList.add('text-mode');
+        el.classList.add('mine');
+        gameOver(false);
+        return;
+    }
+
+    msRevealBatchCount++;
+
+    if (cell.neighbors > 0) {
+        el.innerHTML = cell.neighbors;
+        if (msTextMode) el.classList.add('text-mode');
+    } else {
+        el.innerHTML = '';
+        for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+                revealCell(r + dr, c + dc);
+            }
+        }
+    }
+    checkWin();
+}
+
+function handleMSRightClick(r, c) {
+    if (msGameOver || msIsPaused || msBoard[r][c].revealed) return;
+    
+    
+    const cell = msBoard[r][c];
+    const el = document.getElementById(`ms-${r}-${c}`);
+
+    if (cell.flagged) {
+        if (msQuestionMarks) {
+            // Flag -> Question Mark
+            cell.flagged = false;
+            cell.questioned = true;
+            msFlagsCount++;
+            el.classList.remove('flagged');
+            el.classList.add('questioned');
+            el.innerHTML = msTextMode ? '?' : '\u2753';
+            if (msTextMode) el.classList.add('text-mode');
+            playMSAudio('snd-flag');
+        } else {
+            // Remove flag
+            cell.flagged = false;
+            msFlagsCount++;
+            el.classList.remove('flagged');
+            if (msTextMode) el.classList.add('text-mode');
+            el.innerHTML = '';
+            playMSAudio('snd-flag');
+        }
+    } else if (cell.questioned) {
+        // Question Mark -> Empty
+        cell.questioned = false;
+        el.classList.remove('questioned');
+        el.innerHTML = '';
+        playMSAudio('snd-flag');
+    } else {
+        // Empty -> Flag
+        cell.flagged = true;
+        msFlagsCount--;
+        el.classList.add('flagged');
+        el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+        if (msTextMode) el.classList.add('text-mode');
+        playMSAudio('snd-flag');
+    }
+
+    document.getElementById('minesweeper-flags').innerText = msFlagsCount;
+}
+
+function startMSTimer() {
+   // msStartTime = Date.now();
+    msTimerInterval = setInterval(() => {
+        const totalElapsed = (msElapsedBeforePause + (Date.now() - msStartTime)) / 1000;
+        document.getElementById('minesweeper-timer').innerText = Math.floor(totalElapsed);
+    }, 100);
+}
+
+function checkWin() {
+    let revealed = 0;
+    for (let r = 0; r < msRows; r++) {
+        for (let c = 0; c < msCols; c++) {
+            if (msBoard[r][c].revealed) revealed++;
+        }
+    }
+    if (revealed === (msRows * msCols) - msMinesCount) {
+        gameOver(true);
+    }
+}
+
+function gameOver(won) {
+    msGameOver = true;
+    clearInterval(msTimerInterval);
+    msFinalTime = ((msElapsedBeforePause + (Date.now() - msStartTime)) / 1000) || 0;
+
+    // Update statistics
+    msStats.gamesPlayed++;
+    if (won) {
+        // Don't count wins if View Mines was ever enabled during this game
+        if (!msViewMinesUsed) {
+            msStats.gamesWon++;
+            msStats.currentStreak++;
+            if (msStats.currentStreak > msStats.bestStreak) {
+                msStats.bestStreak = msStats.currentStreak;
+            }
+            if (!msStats.bestTime || msFinalTime < msStats.bestTime) {
+                msStats.bestTime = msFinalTime;
+            }
+        }
+    } else {
+        msStats.currentStreak = 0;
+    }
+    msStats.totalTime += msFinalTime;
+    localStorage.setItem('msStats', JSON.stringify(msStats));
+    updateStatisticsDisplay();
+
+    const status = document.getElementById('minesweeper-status');
+    const diff = document.getElementById('minesweeper-difficulty').value;
+    document.getElementById('minesweeper-timer').innerText = msFinalTime.toFixed(2);
+
+    let gamePoints = 0;
+    let correctFlags = 0;
+    let wrongFlags = 0;
+    let speedScore = 0;
+    let pointBreakdown = "";
+
+    if (won) {
+        playMSAudio('snd-win');
+    }
+
+    // count flags
+    for (let r = 0; r < msRows; r++) {
+        for (let c = 0; c < msCols; c++) {
+            if (msBoard[r][c].flagged) {
+                if (msBoard[r][c].mine) correctFlags++;
+                else wrongFlags++;
+            }
+        }
+    }
+
+    // On win, give flag points for unflagged mines (assumes player knew where they were)
+    if (won) {
+        for (let r = 0; r < msRows; r++) {
+            for (let c = 0; c < msCols; c++) {
+                if (msBoard[r][c].mine && !msBoard[r][c].flagged) {
+                    correctFlags++;
+                }
+            }
+        }
+    }
+
+    // flag scoring (always)
+    gamePoints += correctFlags * 5;
+    gamePoints -= wrongFlags * 10;
+
+    if (won) {
+        gamePoints += 100;
+
+        const parTime = msMinesCount * 2;
+        speedScore = Math.max(0, Math.floor(parTime - msFinalTime));
+        gamePoints += speedScore;
+    } else {
+        gamePoints = Math.max(0, gamePoints);
+    }
+
+    // SAVE BEST TIME LOGIC
+    if (won && !msViewMinesUsed) {
+        const isNewRecord = saveBestTime(diff, msFinalTime);
+        if (isNewRecord) {
+            pointBreakdown += "\nNEW PERSONAL BEST!";
+        }
+    }
+
+    // difficulty
+    let difficultyMultiplier = 1;
+    if (msRows === 12) difficultyMultiplier = 1.5;
+    if (msRows === 16) difficultyMultiplier = 2;
+
+    gamePoints = Math.floor(gamePoints * difficultyMultiplier);
+
+    // Don't award points if View Mines was ever enabled during this game
+    if (msViewMinesUsed) {
+        // No points awarded if View Mines was used
+        gamePoints = 0;
+    }
+    
+    // Show score animation if points gained
+    if (gamePoints > 0) {
+        const oldScore = msTotalScore;
+        const newScore = msTotalScore + gamePoints;
+        showScoreAnimation(gamePoints, () => {
+            // Update score after animation starts
+            animateScoreUpdate(oldScore, newScore);
+            msTotalScore = newScore;
+            localStorage.setItem('msTotalScore', msTotalScore);
+            document.getElementById('minesweeper-total-score').innerText = msTotalScore;
+        });
+    } else {
+        // Update immediately if no points
+        msTotalScore += gamePoints;
+        localStorage.setItem('msTotalScore', msTotalScore);
+        document.getElementById('minesweeper-total-score').innerText = msTotalScore;
+    }
+
+    // Create game over message with replay button
+    const message = won
+        ? (msViewMinesUsed ? `TIME NOT SAVED - VIEW MINES ENABLED` : `YOU WIN! Time: ${msFinalTime.toFixed(2)}s`)
+        : `GAME OVER! (+${gamePoints}) Time: ${msFinalTime.toFixed(2)}s`;
+    
+    status.innerHTML = `<div>${message}</div>`;
+
+    status.className = won
+        ? "font-bold text-center mt-4"
+        : "font-bold text-center mt-4";
+
+    // reveal everything
+    for (let r = 0; r < msRows; r++) {
+        for (let c = 0; c < msCols; c++) {
+            const cell = msBoard[r][c];
+            const el = document.getElementById(`ms-${r}-${c}`);
+            if (!el) continue;
+
+            if (cell.mine && cell.flagged) {
+                el.classList.add('revealed');
+                el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+                if (msTextMode) el.classList.add('text-mode');
+            }
+            else if (cell.mine) {
+                el.classList.add('revealed', 'mine');
+                el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
+                if (msTextMode) el.classList.add('text-mode');
+            }
+            else if (cell.flagged) {
+                el.classList.add('revealed');
+                if (!cell.mine) {
+                    // Incorrect flag - make it red
+                    el.style.color = '#ff7aa8';
+                    el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+                } else {
+                    el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+                }
+                if (msTextMode) el.classList.add('text-mode');
+            }
+        }
+    }
+}
+
+/* ============================================
+   Generated sound effects — soft, cheery, lo-fi
+   All synthesized with the Web Audio API, no
+   audio files involved.
+   ============================================ */
+let msAudioCtx = null;
+let msMasterGain = null;
+
+function msGetAudioCtx() {
+    if (!msAudioCtx) {
+        msAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        msMasterGain = msAudioCtx.createGain();
+        msMasterGain.gain.value = msVolume;
+        msMasterGain.connect(msAudioCtx.destination);
+    }
+    if (msAudioCtx.state === 'suspended') msAudioCtx.resume();
+    return msAudioCtx;
+}
+
+// Plays a single soft tone with its own envelope + gentle lowpass warmth.
+function msPlayTone({ freq = 440, type = 'sine', duration = 0.18, delay = 0,
+                       gain = 0.22, glideTo = null, filterFreq = 2600 }) {
+    const ctx = msGetAudioCtx();
+    const t0 = ctx.currentTime + delay;
+
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (glideTo !== null) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(glideTo, 1), t0 + duration);
+    }
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = filterFreq;
+    filter.Q.value = 0.7;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t0);
+    env.gain.linearRampToValueAtTime(gain, t0 + Math.min(0.015, duration * 0.2));
+    env.gain.exponentialRampToValueAtTime(0.0008, t0 + duration);
+
+    osc.connect(filter);
+    filter.connect(env);
+    env.connect(msMasterGain);
+
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+}
+
+// A soft breathy "poof" using filtered noise, for the mine reveal.
+function msPlayPoof(delay = 0) {
+    const ctx = msGetAudioCtx();
+    const t0 = ctx.currentTime + delay;
+    const duration = 0.32;
+
+    const bufferSize = Math.ceil(ctx.sampleRate * duration);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, t0);
+    filter.frequency.exponentialRampToValueAtTime(140, t0 + duration);
+    filter.Q.value = 0.6;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t0);
+    env.gain.linearRampToValueAtTime(0.16, t0 + 0.02);
+    env.gain.exponentialRampToValueAtTime(0.0008, t0 + duration);
+
+    noise.connect(filter);
+    filter.connect(env);
+    env.connect(msMasterGain);
+    noise.start(t0);
+    noise.stop(t0 + duration + 0.02);
+
+    // a soft low sine underneath for a gentle "boop"
+    msPlayTone({ freq: 220, glideTo: 90, type: 'sine', duration: 0.3, delay, gain: 0.18, filterFreq: 900 });
+}
+
+function playMSAudio(id) {
+    if (!msSoundEnabled) return;
+
+    const soundMap = {
+        'snd-reveal': msSoundReveal,
+        'snd-cascade': msSoundReveal,
+        'snd-flag': msSoundFlag,
+        'snd-explode': msSoundExplode,
+        'snd-win': msSoundWin
+    };
+    if (!soundMap[id]) return;
+
+    try {
+        if (id === 'snd-reveal') {
+            // tiny cheerful blip, pitch wobbles a touch for organic feel
+            const freq = 640 + Math.random() * 90;
+            msPlayTone({ freq, type: 'triangle', duration: 0.11, gain: 0.14, filterFreq: 3200 });
+        } else if (id === 'snd-cascade') {
+            // quick airy sparkle for when a big empty patch opens at once,
+            // one sound instead of a pile-up of individual reveal blips
+            const notes = [780, 980, 1220];
+            notes.forEach((f, i) => {
+                msPlayTone({ freq: f, type: 'triangle', duration: 0.13, delay: i * 0.035, gain: 0.11, filterFreq: 4200 });
+            });
+        } else if (id === 'snd-flag') {
+            // two-note pluck, cheerful little fourth going up
+            msPlayTone({ freq: 620, type: 'triangle', duration: 0.09, gain: 0.16, filterFreq: 3000 });
+            msPlayTone({ freq: 820, type: 'triangle', duration: 0.12, delay: 0.06, gain: 0.16, filterFreq: 3000 });
+        } else if (id === 'snd-explode') {
+            // soft "poof" instead of a harsh bang — still reads as a mishap, stays gentle
+            msPlayPoof(0);
+        } else if (id === 'snd-win') {
+            // bright little ascending arpeggio, major triad + octave
+            const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+            notes.forEach((f, i) => {
+                msPlayTone({ freq: f, type: 'triangle', duration: 0.32, delay: i * 0.09, gain: 0.17, filterFreq: 3800 });
+            });
+        }
+    } catch (e) {
+        // Web Audio unavailable — fail silently, gameplay isn't affected
+    }
+}
+
+function changeVolume(value) {
+    msVolume = parseFloat(value);
+    localStorage.setItem('msVolume', msVolume);
+    if (msMasterGain) msMasterGain.gain.value = msVolume;
+}
+
+function toggleTextMode() {
+    msTextMode = document.getElementById('textMode').checked;
+    localStorage.setItem('msTextMode', msTextMode);
+    // Re-render the board to apply the change
+    if (msBoard.length > 0) {
+        for (let r = 0; r < msRows; r++) {
+            for (let c = 0; c < msCols; c++) {
+                const cell = msBoard[r][c];
+                const el = document.getElementById(`ms-${r}-${c}`);
+                if (cell.revealed) {
+                    if (cell.mine) {
+                        el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
+                    } else if (cell.neighbors > 0) {
+                        el.innerHTML = cell.neighbors;
+                    }
+                } else if (cell.flagged) {
+                    el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+                }
+                if (msTextMode) {
+                    el.classList.add('text-mode');
+                } else {
+                    el.classList.remove('text-mode');
+                }
+            }
+        }
+    }
+}
+
+
+window.addEventListener('keydown', (e) => {
+    
+    // Don't intercept when typing in input fields
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+    }
+    
+    // Handle keybind recording
+    if (msRecordingKeybind) {
+        e.preventDefault();
+        msKeybinds[msRecordingKeybind] = e.key;
+        localStorage.setItem('msKeybinds', JSON.stringify(msKeybinds));
+        let displayText = e.key;
+        if (displayText === ' ') displayText = 'Space';
+        document.getElementById(`keybind-${msRecordingKeybind}`).innerText = displayText;
+        document.getElementById(`keybind-${msRecordingKeybind}`).classList.remove('recording');
+        msRecordingKeybind = null;
+        return;
+    }
+
+    // Handle game keybinds
+    const key = e.key;
+    
+    // Don't intercept Ctrl+number (for tab switching)
+    if (e.ctrlKey && key >= '1' && key <= '9') {
+        return;
+    }
+    
+    // Helper function to check if key matches any keybind
+    const matchesKeybind = (action) => {
+        return msKeybinds[action] === key;
+    };
+    
+    // Reset
+    if (matchesKeybind('reset')) {
+        e.preventDefault();
+        startMinesweeper();
+        return;
+    }
+
+    // Deselect
+    if (matchesKeybind('deselect')) {
+        e.preventDefault();
+        if (msSelectedCell) {
+            const el = document.getElementById(`ms-${msSelectedCell.r}-${msSelectedCell.c}`);
+            if (el) el.classList.remove('selected');
+            msSelectedCell = null;
+        }
+        return;
+    }
+
+    // Navigation - allow navigation even without selection
+    if (matchesKeybind('up')) {
+        e.preventDefault();
+        if (!msSelectedCell) {
+            selectCell(0, 0);
+        } else {
+            moveSelection(-1, 0);
+        }
+        return;
+    }
+    if (matchesKeybind('down')) {
+        e.preventDefault();
+        if (!msSelectedCell) {
+            selectCell(0, 0);
+        } else {
+            moveSelection(1, 0);
+        }
+        return;
+    }
+    if (matchesKeybind('left')) {
+        e.preventDefault();
+        if (!msSelectedCell) {
+            selectCell(0, 0);
+        } else {
+            moveSelection(0, -1);
+        }
+        return;
+    }
+    if (matchesKeybind('right')) {
+        e.preventDefault();
+        if (!msSelectedCell) {
+            selectCell(0, 0);
+        } else {
+            moveSelection(0, 1);
+        }
+        return;
+    }
+    if (matchesKeybind('uncover')) {
+        e.preventDefault();
+        // Prioritize selected cell, otherwise use hovered cell
+        const targetCell = msSelectedCell || msHoveredCell;
+        if (targetCell) {
+            handleMSClick(targetCell.r, targetCell.c);
+        }
+        return;
+    }
+    if (matchesKeybind('flag')) {
+        e.preventDefault();
+        // Prioritize selected cell, otherwise use hovered cell
+        const targetCell = msSelectedCell || msHoveredCell;
+        if (targetCell) {
+            handleMSRightClick(targetCell.r, targetCell.c);
+        }
+        return;
+    }
+    
+});
+
+
+function moveSelection(dr, dc) {
+    if (!msSelectedCell) return;
+    const newR = msSelectedCell.r + dr;
+    const newC = msSelectedCell.c + dc;
+    if (newR >= 0 && newR < msRows && newC >= 0 && newC < msCols) {
+        const oldEl = document.getElementById(`ms-${msSelectedCell.r}-${msSelectedCell.c}`);
+        if (oldEl) oldEl.classList.remove('selected');
+        msSelectedCell = { r: newR, c: newC };
+        const newEl = document.getElementById(`ms-${newR}-${newC}`);
+        if (newEl) newEl.classList.add('selected');
+    }
+}
+
+function toggleSettingsPanel() {
+    const overlay = document.getElementById('settingsOverlay');
+    overlay.classList.toggle('active');
+}
+
+// Close settings when clicking outside overlay
+document.addEventListener('click', (e) => {
+    const overlay = document.getElementById('settingsOverlay');
+    const settingsWindow = document.querySelector('.settings-window');
+    if (overlay.classList.contains('active') && !settingsWindow.contains(e.target) && !e.target.classList.contains('settings-toggle')) {
+        overlay.classList.remove('active');
+    }
+});
+
+
+function switchSettingsTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Update content
+    document.querySelectorAll('.settings-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`settings-${tabName}`).classList.add('active');
+}
+
+function toggleQuestionMarks() {
+    msQuestionMarks = document.getElementById('questionMarks').checked;
+    localStorage.setItem('msQuestionMarks', msQuestionMarks);
+}
+
+function toggleChording() {
+    msChording = document.getElementById('chording').checked;
+    localStorage.setItem('msChording', msChording);
+}
+
+function toggleAutoPause() {
+    msAutoPause = document.getElementById('autoPause').checked;
+    localStorage.setItem('msAutoPause', msAutoPause);
+}
+
+
+// Audio toggles
+function toggleSoundEnabled() {
+    msSoundEnabled = document.getElementById('soundEnabled').checked;
+    localStorage.setItem('msSoundEnabled', msSoundEnabled);
+}
+
+function toggleSoundReveal() {
+    msSoundReveal = document.getElementById('soundReveal').checked;
+    localStorage.setItem('msSoundReveal', msSoundReveal);
+}
+
+function toggleSoundFlag() {
+    msSoundFlag = document.getElementById('soundFlag').checked;
+    localStorage.setItem('msSoundFlag', msSoundFlag);
+}
+
+function toggleSoundExplode() {
+    msSoundExplode = document.getElementById('soundExplode').checked;
+    localStorage.setItem('msSoundExplode', msSoundExplode);
+}
+
+function toggleSoundWin() {
+    msSoundWin = document.getElementById('soundWin').checked;
+    localStorage.setItem('msSoundWin', msSoundWin);
+}
+
+// Statistics functions
+function updateStatisticsDisplay() {
+    document.getElementById('stat-gamesPlayed').textContent = msStats.gamesPlayed;
+    document.getElementById('stat-gamesWon').textContent = msStats.gamesWon;
+    document.getElementById('stat-winRate').textContent = msStats.gamesPlayed > 0 ? Math.round((msStats.gamesWon / msStats.gamesPlayed) * 100) + '%' : '0%';
+    document.getElementById('stat-currentStreak').textContent = msStats.currentStreak;
+    document.getElementById('stat-bestStreak').textContent = msStats.bestStreak;
+    document.getElementById('stat-avgTime').textContent = msStats.gamesPlayed > 0 ? Math.round(msStats.totalTime / msStats.gamesPlayed) + 's' : '0s';
+}
+
+function resetStatistics() {
+    if (confirm('Are you sure you want to reset all statistics?')) {
+        msStats = {
+            gamesPlayed: 0,
+            gamesWon: 0,
+            totalTime: 0,
+            bestTime: null,
+            currentStreak: 0,
+            bestStreak: 0
+        };
+        localStorage.setItem('msStats', JSON.stringify(msStats));
+        updateStatisticsDisplay();
+    }
+}
+
+// Debug functions
+function toggleViewMines() {
+    msViewMines = document.getElementById('viewMines').checked;
+    if (msViewMines) {
+        msViewMinesUsed = true; // Mark that View Mines was used in this game
+    }
+    localStorage.setItem('msViewMines', msViewMines);
+    updateMineVisibility();
+}
+
+
+function updateMineVisibility() {
+    if (!msBoard || msBoard.length === 0) return;
+    
+    const testModeIndicator = document.getElementById('testModeIndicator');
+    
+    for (let r = 0; r < msRows; r++) {
+        for (let c = 0; c < msCols; c++) {
+            const cell = msBoard[r][c];
+            const el = document.getElementById(`ms-${r}-${c}`);
+            if (!el) continue;
+            
+            if (cell.mine && !cell.revealed && msViewMines) {
+                el.style.opacity = '0.3';
+                el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
+            } else if (cell.mine && !cell.revealed && !msViewMines) {
+                el.style.opacity = '1';
+                el.innerHTML = '';
+            }
+        }
+    }
+    
+    // Show/hide test mode indicator
+    testModeIndicator.style.display = msViewMines ? 'block' : 'none';
+}
+
+function toggleHighContrast() {
+    msHighContrast = document.getElementById('highContrast').checked;
+    localStorage.setItem('msHighContrast', msHighContrast);
+    if (msHighContrast) {
+        document.body.classList.add('high-contrast');
+    } else {
+        document.body.classList.remove('high-contrast');
+    }
+}
+
+function toggleHideTimer() {
+    msHideTimer = document.getElementById('hideTimer').checked;
+    localStorage.setItem('msHideTimer', msHideTimer);
+    const timerContainer = document.getElementById('timer-container');
+    const statsGrid = document.getElementById('stats-grid');
+    if (msHideTimer) {
+        timerContainer.style.display = 'none';
+        statsGrid.style.gridTemplateColumns = '1fr';
+        statsGrid.style.maxWidth = '150px';
+        statsGrid.style.margin = '0 auto';
+    } else {
+        timerContainer.style.display = 'block';
+        statsGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        statsGrid.style.maxWidth = 'max-content';
+        statsGrid.style.margin = '0 auto';
+    }
+}
+
+
+function recordKeybind(action) {
+    if (msRecordingKeybind) {
+        // Cancel recording if already recording
+        document.getElementById(`keybind-${msRecordingKeybind}`).classList.remove('recording');
+        msRecordingKeybind = null;
+        return;
+    }
+    msRecordingKeybind = action;
+    document.getElementById(`keybind-${action}`).classList.add('recording');
+    document.getElementById(`keybind-${action}`).innerText = 'Press key...';
+}
+
+function openScoreModal() {
+    document.getElementById('scoreInput').value = msTotalScore;
+    document.getElementById('scoreModal').classList.add('active');
+}
+
+function closeScoreModal() {
+    document.getElementById('scoreModal').classList.remove('active');
+}
+
+function showScoreAnimation(points, callback) {
+    // Always show animations
+    
+    const totalScoreEl = document.getElementById('minesweeper-total-score');
+    const rect = totalScoreEl.getBoundingClientRect();
+    
+    const popup = document.createElement('div');
+    popup.className = 'score-popup';
+    popup.textContent = `+${points}`;
+    popup.style.left = `${rect.right -50}px`;
+    popup.style.top = `${rect.top +15}px`;
+    
+    document.body.appendChild(popup);
+    
+    // Start callback after popup appears
+    setTimeout(callback, 200);
+    
+    // Remove popup after animation
+    setTimeout(() => {
+        popup.remove();
+    }, 2000);
+}
+
+function animateScoreUpdate(startScore, endScore) {
+    // Always animate score
+    
+    const scoreEl = document.getElementById('minesweeper-total-score');
+    const difference = endScore - startScore;
+    const steps = Math.min(Math.abs(difference), 15); // Max 15 steps
+    let current = startScore;
+    let step = 0;
+    
+    const interval = setInterval(() => {
+        step++;
+        
+        // Calculate progress with easing (gets faster)
+        const progress = step / steps;
+        const easedProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease-out
+        
+        current = Math.floor(startScore + (difference * easedProgress));
+        scoreEl.innerText = current;
+        
+        if (step >= steps) {
+            clearInterval(interval);
+            scoreEl.innerText = endScore;
+        }
+    }, 50); // Start at 50ms, will appear to speed up due to easing
+}
+
+function saveScore() {
+    const newScore = parseInt(document.getElementById('scoreInput').value) || 0;
+    msTotalScore = newScore;
+    localStorage.setItem('msTotalScore', msTotalScore);
+    document.getElementById('minesweeper-total-score').innerText = msTotalScore;
+    closeScoreModal();
+}
+
+function togglePause() {
+    if (msGameOver || msFirstClick) return; // Can't pause before game starts
+    
+    const pauseButton = document.getElementById('pauseButton');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const board = document.getElementById('minesweeper-board');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const playIcon = document.getElementById('playIcon');
+    
+    if (!msIsPaused) {
+        // Pause the game
+        msIsPaused = true;
+        pauseButton.textContent = 'Paused';
+        pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors';
+        pauseOverlay.style.display = 'flex';
+        pauseOverlay.style.opacity = '1';
+        pauseIcon.style.display = 'flex';
+        playIcon.style.display = 'none';
+        board.style.opacity = '0';
+        board.style.pointerEvents = 'none';
+        
+        // Pause the timer and record elapsed time
+        if (msTimerInterval) {
+            clearInterval(msTimerInterval);
+            msTimerInterval = null;
+            msElapsedBeforePause += Date.now() - msStartTime;
+        }
+    } else {
+        // Resume the game with animation
+        pauseIcon.style.display = 'none';
+        playIcon.style.display = 'flex';
+        playIcon.parentElement.style.transform = 'scale(1.2)';
+        
+        // Fade out the pause overlay
+        pauseOverlay.style.opacity = '0';
+        
+        // Wait for fade out to complete, then resume
+        setTimeout(() => {
+            pauseOverlay.style.display = 'none';
+            pauseButton.textContent = 'Pause';
+            pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors';
+            board.style.opacity = '1';
+            board.style.pointerEvents = 'auto';
+            
+            // Resume the timer
+            if (!msTimerInterval && !msGameOver && !msFirstClick) {
+                msStartTime = Date.now();
+                startMSTimer();
+            }
+            
+            // Reset icon animation
+            playIcon.parentElement.style.transform = 'scale(1)';
+            
+            msIsPaused = false;
+        }, 300);
+    }
+}
+
+// Add click anywhere to unpause functionality
+document.addEventListener('click', (e) => {
+    if (msIsPaused && e.target.id !== 'pauseButton') {
+        togglePause();
+    }
+});
+
+// Tab visibility detection for auto-pause
+document.addEventListener('visibilitychange', () => {
+    if (!msAutoPause || msGameOver || msFirstClick) return;
+    
+    if (document.hidden) {
+        // Tab is hidden, auto-pause if game is active
+        if (!msIsPaused) {
+            msWasAutoPaused = true;
+            togglePause();
+        }
+    } else {
+        // Tab is visible, auto-resume if we auto-paused
+        if (msIsPaused && msWasAutoPaused) {
+            msWasAutoPaused = false;
+            togglePause();
+        }
+    }
+});
+
+// ... (rest of the code remains the same)
+
+
+function msClamp(v, min, max) {
+    return Math.min(Math.max(v, min), max);
+}
+
+function updateMineSuggestion() {
+    const rowsInput = document.getElementById('minesweeper-custom-rows');
+    const colsInput = document.getElementById('minesweeper-custom-cols');
+    const minesInput = document.getElementById('minesweeper-custom-mines');
+
+    let rows = parseInt(rowsInput.value, 10);
+    let cols = parseInt(colsInput.value, 10);
+    rows = isNaN(rows) ? 10 : msClamp(rows, 4, 30);
+    cols = isNaN(cols) ? 10 : msClamp(cols, 4, 30);
+
+    const totalCells = rows * cols;
+    const maxMines = Math.max(1, Math.floor(totalCells * 0.8)); // Cap at 80% for playability
+
+    const rawMines = parseInt(minesInput.value, 10);
+    // Use a clamped value for every calculation below, so the suggestion
+    // text always reflects a mine count that's actually usable — the raw
+    // out-of-range number never leaks into the math.
+    const currentMines = isNaN(rawMines) ? 1 : msClamp(rawMines, 1, maxMines);
+
+    // Flag the field itself while the raw typed value is out of range,
+    // it gets hard-snapped back on blur via clampMineInputs().
+    const outOfRange = !isNaN(rawMines) && (rawMines < 1 || rawMines > maxMines);
+    minesInput.classList.toggle('out-of-range', outOfRange);
+
+    // Calculate suggestion based on standard difficulties
+    let suggestedMines;
+    if (rows === 8 && cols === 8) {
+        suggestedMines = 10; // Easy: 8x8 = 10 mines (12.5%)
+    } else if (rows === 12 && cols === 12) {
+        suggestedMines = 20; // Medium: 12x12 = 20 mines (13.9%)
+    } else if (rows === 16 && cols === 16) {
+        suggestedMines = 40; // Hard: 16x16 = 40 mines (15.6%)
+    } else {
+        // For custom sizes, scale between the benchmarks
+        const easyCells = 8 * 8;
+        const mediumCells = 12 * 12;
+        const hardCells = 16 * 16;
+        
+        if (totalCells <= easyCells) {
+            suggestedMines = Math.floor((totalCells / easyCells) * 10);
+        } else if (totalCells <= mediumCells) {
+            const ratio = (totalCells - easyCells) / (mediumCells - easyCells);
+            suggestedMines = Math.floor(10 + ratio * (20 - 10));
+        } else if (totalCells <= hardCells) {
+            const ratio = (totalCells - mediumCells) / (hardCells - mediumCells);
+            suggestedMines = Math.floor(20 + ratio * (40 - 20));
+        } else {
+            // For very large boards, use ~15% density
+            suggestedMines = Math.floor(totalCells * 0.15);
+        }
+    }
+    
+    const suggestionEl = document.getElementById('mine-suggestion');
+    const currentDensity = ((currentMines / totalCells) * 100).toFixed(1);
+    const suggestedDensity = ((suggestedMines / totalCells) * 100).toFixed(1);
+    
+    let suggestionText = `Suggested: ${suggestedMines} mines (${suggestedDensity}% density)`;
+    
+    if (outOfRange && rawMines > maxMines) {
+        suggestionText += ` | Too many! Max: ${maxMines}`;
+        suggestionEl.style.color = '#ff6b6b';
+    } else if (outOfRange && rawMines < 1) {
+        suggestionText += ` | Too few! Min: 1`;
+        suggestionEl.style.color = '#ff6b6b';
+    } else if (currentMines > suggestedMines * 1.5) {
+        suggestionText += ` | ${currentDensity}% (Hard)`;
+        suggestionEl.style.color = '#ff6666';
+    } else if (currentMines > suggestedMines * 1.2) {
+        suggestionText += ` | ${currentDensity}% (Medium)`;
+        suggestionEl.style.color = '#ff9900';
+    } else if (currentMines < suggestedMines * 0.8) {
+        suggestionText += ` | ${currentDensity}% (Easy)`;
+        suggestionEl.style.color = '#4da6ff';
+    } else {
+        suggestionText += ` | ${currentDensity}% (Good)`;
+        suggestionEl.style.color = '#00ff00';
+    }
+    
+    suggestionEl.textContent = suggestionText;
+}
+
+// Hard-snaps rows/cols/mines back into valid ranges once the user leaves
+// a field, so an out-of-range number never sticks around unresolved.
+function clampMineInputs() {
+    const rowsInput = document.getElementById('minesweeper-custom-rows');
+    const colsInput = document.getElementById('minesweeper-custom-cols');
+    const minesInput = document.getElementById('minesweeper-custom-mines');
+
+    let rows = parseInt(rowsInput.value, 10);
+    let cols = parseInt(colsInput.value, 10);
+    rows = isNaN(rows) ? 10 : msClamp(rows, 4, 30);
+    cols = isNaN(cols) ? 10 : msClamp(cols, 4, 30);
+    rowsInput.value = rows;
+    colsInput.value = cols;
+
+    const maxMines = Math.max(1, Math.floor(rows * cols * 0.8));
+    let mines = parseInt(minesInput.value, 10);
+    mines = isNaN(mines) ? Math.floor(rows * cols * 0.12) : msClamp(mines, 1, maxMines);
+    minesInput.value = mines;
+    minesInput.classList.remove('out-of-range');
+
+    updateMineSuggestion();
+}
+
+</script>
+
+    <main class="container mx-auto mt-6 p-4" style="max-width: 640px;">
+        <section id="minesweeper" class="p-6 rounded-xl" style="background-color: var(--card-bg); border: 1px solid var(--input-border); box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 0 50px rgba(120,90,220,0.04);">
+            <div class="flex justify-between items-center mb-4 relative">
+                <div>
+                    <h2 class="text-xl font-bold mb-2" style="color: var(--purple); letter-spacing: 0.06em; text-shadow: 0 0 14px var(--purple-glow);">minesweeper</h2>
+                    <div class="text-sm" style="color: var(--text-dim);">score <span id="minesweeper-total-score" class="font-bold" style="color: var(--text-color);">0</span></div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="loading-spinner" id="loadingSpinner"></div>
+                    <button id="pauseButton" onclick="togglePause()" class="px-3 py-1 rounded text-sm font-semibold transition-colors" style="display: none; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border);">Pause</button>
+                </div>
+            </div>
+            <div id="testModeIndicator" style="position: absolute; top: 10px; right: 10px; color: #ff9900; font-weight: bold; opacity: 0.5; pointer-events: none; display: none;">TEST MODE</div>
+            <div id="pauseOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center; z-index: 100; cursor: pointer; transition: opacity 0.3s ease;">
+                <div style="text-align: center; color: white; pointer-events: none;">
+                    <div id="pausePlayIcon" style="margin-bottom: 1rem; transition: transform 0.3s ease;">
+                        <div id="pauseIcon" style="display: flex; gap: 12px; justify-content: center;">
+                            <div style="width: 6px; height: 30px; background-color: white;"></div>
+                            <div style="width: 6px; height: 30px; background-color: white;"></div>
+                        </div>
+                        <div id="playIcon" style="display: none; justify-content: center;">
+                            <div style="width: 0; height: 0; border-left: 25px solid white; border-top: 15px solid transparent; border-bottom: 15px solid transparent; margin-left: 5px;"></div>
+                        </div>
+                    </div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">GAME PAUSED</div>
+                    <div style="font-size: 1rem; opacity: 0.8; margin-top: 0.5rem;">Click anywhere to resume</div>
+                </div>
+            </div>
+                        <div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-4">
+                <select id="minesweeper-difficulty" onchange="toggleCustomMinesweeper()" class="border p-2 rounded w-full md:w-auto" style="background-color: var(--input-bg); color: var(--text-color); border-color: var(--input-border); font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+                    <option value="easy">8x8 (10 mines)</option>
+                    <option value="medium">12x12 (20 mines)</option>
+                    <option value="hard">16x16 (40 mines)</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <button onclick="startMinesweeper()" class="px-6 py-2 rounded font-semibold transition-colors" id="newGameBtn" style="background-color: var(--purple-dim); color: white; border: 1px solid var(--purple-dim); font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.04em;" onmouseover="this.style.boxShadow='0 0 20px var(--purple-glow)'" onmouseout="this.style.boxShadow='none'">new game</button>
+            </div>
+            <div id="minesweeper-custom-panel" class="flex flex-col md:flex-row justify-center items-center gap-4 mb-2" style="display:none;">
+                <div class="flex flex-col">
+                    <label class="text-sm mb-1" for="minesweeper-custom-rows" style="color: var(--text-color);">Rows</label>
+                    <input id="minesweeper-custom-rows" type="number" min="4" max="30" value="10" class="ms-custom-input rounded w-20" oninput="updateMineSuggestion()" onblur="clampMineInputs()">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm mb-1" for="minesweeper-custom-cols" style="color: var(--text-color);">Cols</label>
+                    <input id="minesweeper-custom-cols" type="number" min="4" max="30" value="10" class="ms-custom-input rounded w-20" oninput="updateMineSuggestion()" onblur="clampMineInputs()">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm mb-1" for="minesweeper-custom-mines" style="color: var(--text-color);">Mines</label>
+                    <input id="minesweeper-custom-mines" type="number" min="1" value="12" class="ms-custom-input rounded w-20" oninput="updateMineSuggestion()" onblur="clampMineInputs()">
+                </div>
+            </div>
+            <div id="mine-suggestion-container" class="text-center mb-4" style="display:none;">
+                <div id="mine-suggestion" class="text-xs" style="color: var(--text-color); opacity: 0.6;">Suggested: 12 mines (12% density)</div>
+            </div>
+            <div class="text-center mb-4 overflow-auto">
+                <div id="minesweeper-board" class="inline-grid"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-center max-w-xs mx-auto" id="stats-grid">
+                <div class="p-3 rounded" style="background-color: var(--input-bg); border: 1px solid var(--input-border);">
+                    <div class="text-xl font-bold" style="color: var(--danger);" id="minesweeper-flags">0</div>
+                    <div class="text-xs uppercase" style="opacity: 0.6; letter-spacing: 0.06em; color: var(--text-dim);">flags</div>
+                </div>
+                <div class="p-3 rounded" id="timer-container" style="background-color: var(--input-bg); border: 1px solid var(--input-border);">
+                    <div class="text-xl font-bold" style="color: var(--purple);" id="minesweeper-timer">0</div>
+                    <div class="text-xs uppercase" style="opacity: 0.6; letter-spacing: 0.06em; color: var(--text-dim);">time</div>
+                </div>
+            </div>
+            <div id="minesweeper-status" class="text-center mt-4 font-bold text-lg h-8"></div>
+            <div class="mt-6 pt-4 text-center" style="border-top: 1px solid var(--input-border);">
+                <div style="color: var(--text-dim); font-size: 11px; letter-spacing: 0.03em; opacity: 0.55;">
+                    best &nbsp;easy <span id="best-easy">--</span> &nbsp;·&nbsp; medium <span id="best-medium">--</span> &nbsp;·&nbsp; hard <span id="best-hard">--</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+</body>
+</html>
