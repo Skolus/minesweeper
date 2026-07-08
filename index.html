@@ -6,126 +6,62 @@
     <meta name="description" content="Minesweeper with adjustable board size, mine density, stats viewer, chording, and keyboard support.">
     <title>Minesweeper</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
     <style>
+        /* Allow scrolling */
         html, body {
             overflow: auto;
             margin: 0;
             padding: 0;
         }
-
+        
+        /* Theme Variables */
         :root {
-            --bg-color: #08070c; 
-            --bg-void: #050408;
-            --text-color: #e9e5f7;
-            --text-dim: #8b84a8;
-            --board-bg: #0d0b14;
-            --cell-bg: #14121f;
-            --cell-hover: #1c1830;
-            --cell-revealed: #0a0910;
-            --cell-border: rgba(164, 143, 255, 0.10);
-            --button-bg: #1a1628;
-            --button-hover: #251f3d;
-            --card-bg: #0c0a13;
-            --input-bg: #120f1c;
-            --input-border: rgba(164, 143, 255, 0.16);
-            --purple: #a48fff;
-            --purple-dim: #6f5aad;
-            --purple-glow: rgba(164, 143, 255, 0.35);
-            --danger: #ff7aa8;
-            --success: #7fe8c8;
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
-            background: var(--bg-color);
-            position: relative;
-        }
-
-        /* ---- rain canvas background ---- */
-        #rainCanvas {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -2;
-            pointer-events: none;
-            background: radial-gradient(circle at 50% 0%, #0d0a17 0%, var(--bg-void) 70%);
-        }
-        #vignette {
-            position: fixed;
-            inset: 0;
-            z-index: -1;
-            pointer-events: none;
-            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%);
-        }
-
-        /* ---- top nav ---- */
-        .site-nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 24px 20px 0;
-            font-size: 13px;
-            color: var(--text-dim);
-            letter-spacing: 0.05em;
-        }
-        .site-nav a {
-            color: var(--text-dim);
-            text-decoration: none;
-            transition: color 0.2s ease;
-        }
-        .site-nav a:hover { color: var(--purple); }
-        .site-title {
-            color: var(--purple);
-            text-shadow: 0 0 12px var(--purple-glow);
-            letter-spacing: 0.08em;
+            --bg-color: #000000;       /* Ultra dark body background */
+            --text-color: #ffffff;     /* White text for sharp contrast */
+            --board-bg: #0d0d0d;       /* Very subtle dark grey for the board outline */
+            --cell-bg: #141414;        /* Dark grey unrevealed cells */
+            --cell-hover: #222222;     /* Slight highlight when hovering over a cell */
+            --cell-revealed: #000000;  /* Pure black revealed cells */
+            --cell-border: #1f1f1f;    /* Distinct gridlines to separate your black cells */
+            --button-bg: #222222;      /* Sleek dark theme buttons */
+            --button-hover: #333333;   /* Button hover state */
+            --card-bg: #0a0a0a;        /* Settings window background */
+            --input-bg: #141414;       /* Interactive inputs background */
+            --input-border: #262626;   /* Borders for text fields / checkboxes */
         }
 
         /* Minesweeper Styling */
         #minesweeper-board {
-            --ms-cell-size: 44px;
-            --ms-gap: 3px;
             user-select: none;
-            touch-action: manipulation;
             margin: 0 auto;
             display: inline-grid;
-            gap: var(--ms-gap);
+            gap: 0;
             background: var(--board-bg);
-            padding: 12px;
-            border-radius: 10px;
-            box-shadow: inset 0 0 0 1px rgba(164,143,255,0.06), 0 20px 50px rgba(0,0,0,0.5), 0 0 40px rgba(120,90,220,0.05);
+            padding: 10px;
+            border-radius: 16px;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1), 0 20px 40px rgba(0,0,0,0.2);
         }
         .ms-cell {
             box-sizing: border-box;
-            width: var(--ms-cell-size);
-            height: var(--ms-cell-size);
+            width: 48px;
+            height: 48px;
             background-color: var(--cell-bg);
             border: 1px solid var(--cell-border);
-            border-radius: 5px;
+            border-radius: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 600;
-            font-size: calc(var(--ms-cell-size) * 0.44);
-            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 1.5rem;
             color: var(--text-color);
             cursor: pointer;
-            transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.15s ease;
+            transition: all 0.1s ease;
             user-select: none;
-            touch-action: manipulation;
-            -webkit-touch-callout: none;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
         }
         .ms-cell:hover:not(.revealed):not(.flagged) {
             transform: translateY(-1px);
             background-color: var(--cell-hover);
-            box-shadow: 0 0 0 1px var(--purple-glow), 0 4px 12px rgba(164,143,255,0.12);
         }
         .ms-cell.revealed {
             border-color: var(--cell-border);
@@ -135,45 +71,55 @@
         }
         .ms-cell.flagged {
             background-color: var(--cell-bg);
-            color: transparent;
-        }
-        .ms-cell.flagged.text-mode {
             color: var(--text-color);
         }
-        .ms-cell.mine { background-color: #1a0d16; color: var(--danger); }
+        .ms-cell.mine { background-color: #000000; color: #ff0000; }
+
 
         /* Score Animation */
         .score-popup {
             position: absolute;
-            color: var(--success);
+            color: #00ff00;
             font-weight: bold;
-            font-size: 15px;
+            font-size: 16px;
             pointer-events: none;
             z-index: 1001;
             animation: scorePopup 2s ease-out forwards;
-            text-shadow: 0 0 8px rgba(127,232,200,0.5);
         }
         @keyframes scorePopup {
-            0% { opacity: 0; transform: translateY(8px) scale(0.8); }
-            20% { opacity: 1; transform: translateY(0) scale(1); }
-            80% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(0) scale(0.8); }
+            0% {
+                opacity: 0;
+                transform: translateY(8px) scale(0.8);
+            }
+            20% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            80% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(0) scale(0.8);
+            }
         }
-        .ms-cell img { width: calc(var(--ms-cell-size) * 0.73); height: calc(var(--ms-cell-size) * 0.73); image-rendering: pixelated; }
-        .ms-cell.revealed[data-mines="1"] { color: #8fb8ff; }
-        .ms-cell.revealed[data-mines="2"] { color: #7fe8c8; }
-        .ms-cell.revealed[data-mines="3"] { color: #ff9d9d; }
-        .ms-cell.revealed[data-mines="4"] { color: #b39dff; }
-        .ms-cell.revealed[data-mines="5"] { color: #ff9dd4; }
-        .ms-cell.revealed[data-mines="6"] { color: #7fe0e8; }
-        .ms-cell.revealed[data-mines="7"] { color: #e9e5f7; }
-        .ms-cell.revealed[data-mines="8"] { color: #a89fc4; }
-
-        .ms-cell.text-mode { font-size: 1.4rem; }
-        .ms-cell.text-mode img { display: none; }
+        .ms-cell.revealed[data-mines="1"] { color: #4da6ff; }
+        .ms-cell.revealed[data-mines="2"] { color: #00ff00; }
+        .ms-cell.revealed[data-mines="3"] { color: #ff4d4d; }
+        .ms-cell.revealed[data-mines="4"] { color: #6666ff; }
+        .ms-cell.revealed[data-mines="5"] { color: #ff6666; }
+        .ms-cell.revealed[data-mines="6"] { color: #00ffff; }
+        .ms-cell.revealed[data-mines="7"] { color: #ffffff; }
+        .ms-cell.revealed[data-mines="8"] { color: #cccccc; }
 
         /* Settings Menu */
-        .settings-menu { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .settings-menu {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
         .settings-toggle {
             background: var(--card-bg);
             color: var(--text-color);
@@ -181,36 +127,33 @@
             padding: 10px 16px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
-            font-family: 'JetBrains Mono', monospace;
-            letter-spacing: 0.04em;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .settings-toggle:hover {
-            border-color: var(--purple-dim);
-            box-shadow: 0 0 16px rgba(120,90,220,0.15);
+            font-size: 14px;
         }
         .settings-overlay {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 4, 8, 0.85);
-            backdrop-filter: blur(2px);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
             z-index: 2000;
             justify-content: center;
             align-items: flex-start;
             padding-top: 100px;
         }
-        .settings-overlay.active { display: flex; }
+        .settings-overlay.active {
+            display: flex;
+        }
         .settings-overlay.settings-window {
             position: fixed;
-            top: 50%; left: 50%;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
             background: var(--card-bg);
-            border: 1px solid var(--input-border);
             border-radius: 12px;
             padding: 24px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 60px rgba(120,90,220,0.08);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             max-width: 500px;
             width: 90%;
             max-height: 80vh;
@@ -222,47 +165,60 @@
             gap: 8px;
             margin-bottom: 20px;
             border-bottom: 1px solid var(--input-border);
-            flex-wrap: wrap;
         }
         .settings-tab {
-            padding: 8px 14px;
+            padding: 8px 16px;
             background: none;
             border: none;
-            color: var(--text-color);
-            opacity: 0.5;
+            color: #ffffff; /* Forces unselected tabs to be bright white */
+            opacity: 0.6;   /* Gives a clean, dim look to inactive tabs */
             cursor: pointer;
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
         }
-        .settings-tab:hover { opacity: 0.85; }
+        .settings-tab:hover {
+            opacity: 1;     /* Shines brightly when you hover over it */
+        }
         .settings-tab.active {
-            border-bottom-color: var(--purple);
-            color: var(--purple);
-            opacity: 1;
+            border-bottom-color: #ffffff; /* White indicator underline */
+            color: #ffffff;               /* Keeps active tab pure white */
+            opacity: 1;                   /* Full solid contrast for active tab */
         }
-        .settings-content { display: none; }
-        .settings-content.active { display: block; }
+        .settings-content {
+            display: none;
+        }
+        .settings-content.active {
+            display: block;
+        }
         .settings-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
         }
-        .settings-item:last-child { margin-bottom: 0; }
-        .settings-item label { color: var(--text-color); font-size: 13px; }
-        .settings-item input[type="checkbox"] { cursor: pointer; accent-color: var(--purple); }
+        .settings-item:last-child {
+            margin-bottom: 0;
+        }
+        .settings-item label {
+            color: var(--text-color);
+            font-size: 14px;
+        }
+        .settings-item input[type="checkbox"] {
+            cursor: pointer;
+        }
         .tooltip {
             position: relative;
             display: inline-block;
             margin-left: 8px;
-            color: var(--text-dim);
+            color: var(--text-color);
+            opacity: 0.5;
             font-size: 12px;
             cursor: help;
             transition: opacity 0.2s;
         }
-        .tooltip:hover { color: var(--purple); }
+        .tooltip:hover {
+            opacity: 0.8;
+        }
         .tooltip .tooltip-content {
             visibility: hidden;
             width: 200px;
@@ -280,10 +236,18 @@
             border: 1px solid var(--input-border);
             font-size: 12px;
             line-height: 1.4;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        .tooltip .tooltip-content.right-edge { left: auto; right: 0; margin-left: 0; }
-        .tooltip .tooltip-content.right-edge::after { left: auto; right: 20px; margin-left: 0; }
+        .tooltip .tooltip-content.right-edge {
+            left: auto;
+            right: 0;
+            margin-left: 0;
+        }
+        .tooltip .tooltip-content.right-edge::after {
+            left: auto;
+            right: 20px;
+            margin-left: 0;
+        }
         .tooltip .tooltip-content::after {
             content: "";
             position: absolute;
@@ -294,12 +258,34 @@
             border-style: solid;
             border-color: var(--input-bg) transparent transparent transparent;
         }
-        .tooltip:hover .tooltip-content { visibility: visible; opacity: 1; }
-        .settings-item input[type="range"] { width: 120px; cursor: pointer; accent-color: var(--purple); }
-        .keybind-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--input-border); }
-        .keybind-section h4 { color: var(--text-dim); font-size: 13px; margin-bottom: 12px; letter-spacing: 0.04em; }
-        .keybind-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .keybind-item label { color: var(--text-color); font-size: 12px; }
+        .tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+        .settings-item input[type="range"] {
+            width: 120px;
+            cursor: pointer;
+        }
+        .keybind-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--input-border);
+        }
+        .keybind-section h4 {
+            color: var(--text-color);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .keybind-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .keybind-item label {
+            color: var(--text-color);
+            font-size: 12px;
+        }
         .keybind-button {
             background: var(--input-bg);
             color: var(--text-color);
@@ -310,33 +296,65 @@
             font-size: 12px;
             min-width: 60px;
             text-align: center;
-            font-family: 'JetBrains Mono', monospace;
         }
-        .keybind-button.recording { background: var(--purple-dim); color: white; }
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
-        .stat-item { background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--input-border); }
-        .stat-label { color: var(--text-dim); font-size: 11px; margin-bottom: 4px; letter-spacing: 0.04em; }
-        .stat-value { color: var(--purple); font-size: 17px; font-weight: bold; }
+        .keybind-button.recording {
+            background: var(--button-bg);
+            color: white;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .stat-item {
+            background: var(--input-bg);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--input-border);
+        }
+        .stat-label {
+            color: var(--text-color);
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            color: var(--text-color);
+            font-size: 18px;
+            font-weight: bold;
+        }
 
+        /* Loading Spinner */
         .loading-spinner {
             display: none;
             position: absolute;
-            top: 10px; right: 10px;
-            width: 22px; height: 22px;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
             border: 3px solid var(--input-border);
-            border-top-color: var(--purple);
+            border-top-color: var(--button-bg);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        .loading-spinner.active { display: block; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-spinner.active {
+            display: block;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.2); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
         }
 
-        .ms-cell.selected { outline: 2px solid var(--purple); outline-offset: -2px; }
+        /* Cell Selection */
+        .ms-cell.selected {
+            outline: 3px solid var(--button-bg);
+            outline-offset: -3px;
+        }
 
         /* High Contrast Mode */
         body.high-contrast {
@@ -366,13 +384,19 @@
         /* Score Edit Modal */
         .score-modal {
             display: none;
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5,4,8,0.8);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
             z-index: 2000;
             justify-content: center;
             align-items: center;
         }
-        .score-modal.active { display: flex; }
+        .score-modal.active {
+            display: flex;
+        }
         .score-modal-content {
             background: var(--card-bg);
             padding: 24px;
@@ -380,7 +404,10 @@
             border: 1px solid var(--input-border);
             min-width: 300px;
         }
-        .score-modal-content h3 { margin-bottom: 16px; color: var(--purple); }
+        .score-modal-content h3 {
+            margin-bottom: 16px;
+            color: var(--text-color);
+        }
         .score-modal-content input {
             width: 100%;
             padding: 8px 12px;
@@ -390,68 +417,84 @@
             background: var(--input-bg);
             color: var(--text-color);
             font-size: 16px;
-            font-family: 'JetBrains Mono', monospace;
         }
-        .score-modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+        .score-modal-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
         .score-modal-buttons button {
             padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
             border: none;
-            font-size: 13px;
-            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
         }
-        .score-modal-buttons .cancel { background: var(--input-bg); color: var(--text-color); }
-        .score-modal-buttons .save { background: var(--purple-dim); color: white; }
-
-        .ms-custom-input {
-            background-color: var(--input-bg);
+        .score-modal-buttons .cancel {
+            background: var(--input-bg);
             color: var(--text-color);
-            border: 1px solid var(--input-border);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            padding: 8px 10px;
-            text-align: center;
-            -moz-appearance: textfield;
-            appearance: textfield;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        .ms-custom-input::-webkit-outer-spin-button,
-        .ms-custom-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        .ms-custom-input:focus {
-            outline: none;
-            border-color: var(--purple-dim);
-            box-shadow: 0 0 0 2px var(--purple-glow);
-        }
-        .ms-custom-input.out-of-range {
-            border-color: var(--danger);
-            box-shadow: 0 0 0 2px rgba(255, 122, 168, 0.25);
+        .score-modal-buttons .save {
+            background: var(--button-bg);
+            color: white;
         }
 
-        #minesweeper-difficulty {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0 L5 6 L10 0 Z' fill='%23a48fff'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            padding-right: 28px;
+        #helpBtn {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          border: none;
+          cursor: pointer;
+          font-weight: bold;
+        }
+        
+        .modal {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+          background: black;
+          width: 300px;
+          margin: 15% auto;
+          padding: 15px;
+          border-radius: 8px;
+          position: relative;
+        }
+        
+        #closeHelp {
+          position: absolute;
+          top: 5px;
+          right: 10px;
+          cursor: pointer;
         }
     </style>
 </head>
-<body class="min-h-screen pb-10" style="background-color: var(--bg-color); color: var(--text-color);">
+<body class="font-sans min-h-screen pb-10" style="background-color: var(--bg-color); color: var(--text-color);">
 
-<canvas id="rainCanvas"></canvas>
-<div id="vignette"></div>
+<button id="helpBtn">?</button>
 
-<nav class="site-nav">
-    <a href="https://skolus.github.io" class="site-title">skolus</a>
-</nav>
-
-
+<div id="helpModal" class="modal">
+  <div class="modal-content">
+    <span id="closeHelp">&times;</span>
+    <h2>Features</h2>
+    <ul>
+      <li>Adjustable board size</li>
+      <li>Configurable mine density</li>
+      <li>Stats viewer</li>
+      <li>Chording support</li>
+      <li>Keyboard controls</li>
+    </ul>
+  </div>
+</div>
     
     <div class="settings-menu">
         <button class="settings-toggle" onclick="toggleSettingsPanel()">Settings</button>
@@ -465,14 +508,9 @@
                 <button class="settings-tab" onclick="switchSettingsTab('keybinds')">Keybinds</button>
                 <button class="settings-tab" onclick="switchSettingsTab('statistics')">Statistics</button>
                 <button class="settings-tab" onclick="switchSettingsTab('debug')">Debug</button>
-                <button class="settings-tab" onclick="switchSettingsTab('about')">About</button>
             </div>
 
             <div class="settings-content active" id="settings-general">
-                <div class="settings-item">
-                    <label>Text Mode<span class="tooltip">?<span class="tooltip-content">Turn this off to show custom textures</span></span></label>
-                    <input type="checkbox" id="textMode" onchange="toggleTextMode()">
-                </div>
                 <div class="settings-item">
                     <label>High Contrast</label>
                     <input type="checkbox" id="highContrast" onchange="toggleHighContrast()">
@@ -591,7 +629,7 @@
                     </div>
                 </div>
                 <div class="settings-item" style="margin-top: 20px;">
-                    <button onclick="resetStatistics()" style="background: #6b3050; color: white; padding: 8px 16px; border: 1px solid var(--input-border); border-radius: 6px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 13px;">reset statistics</button>
+                    <button onclick="resetStatistics()" style="background: #dc2626; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Reset Statistics</button>
                 </div>
             </div>
 
@@ -602,12 +640,6 @@
                 </div>
                 <div class="settings-item">
                     <button onclick="showScoreAnimation(30, () => animateScoreUpdate(msTotalScore, msTotalScore + 30))" style="background: var(--button-bg); color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Test Score</button>
-                </div>
-            </div>
-            <div class="settings-content" id="settings-about">
-                <div class="text-center" style="padding: 8px 0 4px;">
-                    <a href="https://skolus.github.io" target="_blank" rel="noopener" style="color: var(--purple); font-size: 14px; text-decoration: none; letter-spacing: 0.04em;">my site</a>
-                    <div style="color: var(--text-dim); font-size: 12px; margin-top: 10px; letter-spacing: 0.04em;">made by skolus</div>
                 </div>
             </div>
         </div>
@@ -625,70 +657,13 @@
     </div>
 
     <script>
-// ============================================
-// Ambient rain background — matches skolus.github.io
-// ============================================
-(function () {
-    const canvas = document.getElementById('rainCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let drops = [];
-
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        const count = Math.floor((canvas.width * canvas.height) / 9000);
-        drops = new Array(count).fill(null).map(() => makeDrop());
-    }
-
-    function makeDrop() {
-        return {
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            len: 10 + Math.random() * 22,
-            speed: 3 + Math.random() * 6,
-            drift: -0.4 + Math.random() * 0.8,
-            alpha: 0.05 + Math.random() * 0.16
-        };
-    }
-
-    function tick() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = 'rgba(164,143,255,1)';
-        ctx.lineCap = 'round';
-        for (const d of drops) {
-            ctx.globalAlpha = d.alpha;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(d.x, d.y);
-            ctx.lineTo(d.x + d.drift * 3, d.y + d.len);
-            ctx.stroke();
-
-            d.x += d.drift;
-            d.y += d.speed;
-            if (d.y > canvas.height) {
-                d.y = -d.len;
-                d.x = Math.random() * canvas.width;
-            }
-        }
-        ctx.globalAlpha = 1;
-        requestAnimationFrame(tick);
-    }
-
-    window.addEventListener('resize', resize);
-    resize();
-    requestAnimationFrame(tick);
-})();
-    </script>
-
-    <script>
 let msTotalScore = parseInt(localStorage.getItem('msTotalScore')) || 0;
-let msTextMode = localStorage.getItem('msTextMode') !== 'false'; // Default on
 let msVolume = parseFloat(localStorage.getItem('msVolume')) || 0.5;
 let msHighContrast = localStorage.getItem('msHighContrast') === 'true';
 let msHideTimer = localStorage.getItem('msHideTimer') === 'true';
 let msQuestionMarks = localStorage.getItem('msQuestionMarks') === 'true';
 let msChording = localStorage.getItem('msChording') !== 'false'; // Default on
+let msNoAnimations = localStorage.getItem('msNoAnimations') !== 'false'; // Default on
 let msAutoPause = localStorage.getItem('msAutoPause') !== 'false'; // Default on
 
 // Sound settings
@@ -740,6 +715,8 @@ let msBoard = [];
 let msRows = 8, msCols = 8, msMinesCount = 10;
 let msGameOver = false;
 let msFirstClick = true;
+let msGeneratingBoard = false; // true while placeMines() is running on the first click, blocks re-entrant clicks
+let msGameId = 0; // bumped every new game, lets a stale pending first-click timeout detect it's obsolete
 let msTimerInterval;
 let msStartTime = 0;
 let msFinalTime = 0;
@@ -753,7 +730,6 @@ let msIsReplaying = false; // Track if currently replaying
 document.addEventListener('DOMContentLoaded', () => {
     updateBestTimesDisplay();
     // Load settings FIRST
-    document.getElementById('textMode').checked = msTextMode;
     document.getElementById('volumeSlider').value = msVolume;
     document.getElementById('highContrast').checked = msHighContrast;
     document.getElementById('hideTimer').checked = msHideTimer;
@@ -771,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Debug settings
     document.getElementById('viewMines').checked = msViewMines;
     
-    // Check if custom difficulty is selected and show panel 
+    // Check if custom difficulty is selected and show panel
     toggleCustomMinesweeper();
     
     // NOW start the game after settings are loaded
@@ -792,14 +768,33 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.innerText = displayText;
         }
     });
-    // Master volume is applied directly to the synth gain node when audio starts
+    // Set initial volume for all audio elements
+    const audioElements = document.querySelectorAll('audio');
+    audioElements.forEach(audio => {
+        audio.volume = msVolume;
+    });
 });
+
+const modal = document.getElementById("helpModal");
+const btn = document.getElementById("helpBtn");
+const close = document.getElementById("closeHelp");
+
+btn.onclick = () => modal.style.display = "block";
+close.onclick = () => modal.style.display = "none";
+
+window.onclick = (e) => {
+  if (e.target === modal) modal.style.display = "none";
+};
 
 function startMinesweeper() {
     const diff = document.getElementById('minesweeper-difficulty').value;
     const settings = getMinesweeperSettings(diff);
 
-    // (no lingering audio elements to stop — synth sounds are one-shot)
+    const winSnd = document.getElementById('snd-win');
+    if (winSnd) {
+        winSnd.pause();
+        winSnd.currentTime = 0;
+    }
 
     msRows = settings.rows;
     msCols = settings.cols;
@@ -809,6 +804,8 @@ function startMinesweeper() {
 
     msGameOver = false;
     msFirstClick = true;
+    msGeneratingBoard = false;
+    msGameId++;
     msFinalTime = 0;
     msFlagsCount = msMinesCount;
     msIsPaused = false;
@@ -824,7 +821,7 @@ function startMinesweeper() {
     const pauseButton = document.getElementById('pauseButton');
     pauseButton.style.display = 'none';
     pauseButton.textContent = 'Pause';
-    pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors';
+    pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors bg-white text-gray-800 hover:bg-gray-100';
     
     // Reset pause overlay
     document.getElementById('pauseOverlay').style.display = 'none';
@@ -904,48 +901,11 @@ function toggleCustomMinesweeper() {
     }
 }
 
-function fitMSBoard() {
-    const boardEl = document.getElementById('minesweeper-board');
-    if (!boardEl || !msCols) return;
-
-    const BASE_CELL = 44;
-    const MIN_CELL = 16;
-    const BOARD_PADDING = 24; // 12px padding on each side
-    const GAP = 3;
-
-    // Available width is whatever the board's containing block can offer.
-    const wrapper = boardEl.parentElement;
-    const availableWidth = (wrapper ? wrapper.clientWidth : window.innerWidth) - 4; // small safety margin
-
-    const totalGapCols = GAP * (msCols - 1);
-    const maxCellFromWidth = Math.floor((availableWidth - BOARD_PADDING - totalGapCols) / msCols);
-
-    // Available height: viewport height minus whatever sits above the board
-    // and a reserve for the UI below it (stats grid, footer, etc).
-    const boardTop = wrapper ? wrapper.getBoundingClientRect().top : 0;
-    const BOTTOM_RESERVE = 200;
-    const availableHeight = window.innerHeight - boardTop - BOTTOM_RESERVE;
-
-    const totalGapRows = GAP * (msRows - 1);
-    const maxCellFromHeight = Math.floor((availableHeight - BOARD_PADDING - totalGapRows) / msRows);
-
-    const cellSize = Math.max(MIN_CELL, Math.min(BASE_CELL, maxCellFromWidth, maxCellFromHeight));
-
-    boardEl.style.setProperty('--ms-cell-size', `${cellSize}px`);
-    boardEl.style.gridTemplateColumns = `repeat(${msCols}, var(--ms-cell-size))`;
-    boardEl.style.width = 'min-content';
-}
-
-window.addEventListener('resize', () => {
-    if (typeof msCols !== 'undefined' && document.getElementById('minesweeper-board').children.length) {
-        fitMSBoard();
-    }
-});
-
 function initMSBoard() {
     const boardEl = document.getElementById('minesweeper-board');
     boardEl.innerHTML = '';
-    fitMSBoard();
+    boardEl.style.gridTemplateColumns = `repeat(${msCols}, 48px)`;
+    boardEl.style.width = 'min-content';
     msBoard = [];
     msSelectedCell = null;
 
@@ -969,53 +929,6 @@ function initMSBoard() {
                 e.preventDefault();
                 handleMSRightClick(r, c);
             };
-
-            // Touch support: tap reveals, tap-and-hold flags, and we
-            // suppress the synthetic mouse/click events + double-tap zoom.
-            let touchTimer = null;
-            let touchMoved = false;
-            let longPressFired = false;
-            const LONG_PRESS_MS = 400;
-            const MOVE_CANCEL_PX = 10;
-            let touchStartX = 0, touchStartY = 0;
-
-            cellEl.addEventListener('touchstart', (e) => {
-                touchMoved = false;
-                longPressFired = false;
-                const t = e.touches[0];
-                touchStartX = t.clientX;
-                touchStartY = t.clientY;
-
-                touchTimer = setTimeout(() => {
-                    longPressFired = true;
-                    if (navigator.vibrate) navigator.vibrate(15);
-                    handleMSRightClick(r, c);
-                }, LONG_PRESS_MS);
-            }, { passive: true });
-
-            cellEl.addEventListener('touchmove', (e) => {
-                const t = e.touches[0];
-                if (Math.abs(t.clientX - touchStartX) > MOVE_CANCEL_PX ||
-                    Math.abs(t.clientY - touchStartY) > MOVE_CANCEL_PX) {
-                    touchMoved = true;
-                    clearTimeout(touchTimer);
-                }
-            }, { passive: true });
-
-            cellEl.addEventListener('touchend', (e) => {
-                clearTimeout(touchTimer);
-                // Prevent the browser from firing a synthetic mousedown/click
-                // (which would double-trigger the action) and from treating
-                // this as part of a double-tap-to-zoom gesture.
-                e.preventDefault();
-                if (!touchMoved && !longPressFired) {
-                    handleMSClick(r, c);
-                }
-            });
-
-            cellEl.addEventListener('touchcancel', () => {
-                clearTimeout(touchTimer);
-            });
 
             cellEl.onmouseenter = () => {
                 msHoveredCell = { r, c };
@@ -1042,7 +955,7 @@ function selectCell(r, c) {
 }
 
 function handleMSClick(r, c) {
-    if (msGameOver || msIsPaused || msBoard[r][c].flagged || msBoard[r][c].questioned) return;
+    if (msGameOver || msIsPaused || msGeneratingBoard || msBoard[r][c].flagged || msBoard[r][c].questioned) return;
     
         
     // Allow clicking on revealed cells for chording, but only if they have neighbors
@@ -1051,16 +964,19 @@ function handleMSClick(r, c) {
     if (msFirstClick) {
         document.getElementById('loadingSpinner').classList.add('active');
         msFirstClick = false;
+        msGeneratingBoard = true;
+        const thisGameId = msGameId;
         
         // 1. Capture physical start time IMMEDIATELY on click
         msStartTime = Date.now(); 
 
         setTimeout(() => {
+            // If a new game/difficulty change started while this was pending, abandon it
+            if (thisGameId !== msGameId) return;
             placeMines(r, c);
             startMSTimer();
-            msBeginRevealBatch();
             revealCell(r, c);
-            msEndRevealBatch();
+            msGeneratingBoard = false;
             document.getElementById('loadingSpinner').classList.remove('active');
             // Show pause button when game starts
             document.getElementById('pauseButton').style.display = 'block';
@@ -1077,25 +993,20 @@ function handleMSClick(r, c) {
         
         if (flaggedCount === msBoard[r][c].neighbors) {
             console.log(`Chording activated! Revealing ${neighbors.length} neighbors`);
-            // Reveal all unflagged neighbors — batched as one action so the
-            // whole chord plays a single sound rather than one per cell
-            msBeginRevealBatch();
+            // Reveal all unflagged neighbors
             neighbors.forEach(n => {
                 if (!msBoard[n.r][n.c].flagged && !msBoard[n.r][n.c].revealed) {
                     console.log(`Revealing neighbor (${n.r},${n.c})`);
                     handleMSClick(n.r, n.c);
                 }
             });
-            msEndRevealBatch();
             return; // Don't proceed to normal reveal
         } else {
             console.log(`Chording not activated: ${flaggedCount} flags != ${msBoard[r][c].neighbors} neighbors`);
         }
     }
 
-    msBeginRevealBatch();
     revealCell(r, c);
-    msEndRevealBatch();
 }
 
 function getNeighbors(r, c) {
@@ -1230,28 +1141,6 @@ function checkSolvability(startR, startC) {
     return totalRevealed === (msRows * msCols) - msMinesCount;
 }
 
-// Tracks cells revealed within a single user action (a click, or a chord),
-// so a big flood-fill plays one nice "cascade" sound instead of dozens of
-// stacked reveal blips.
-let msRevealBatchDepth = 0;
-let msRevealBatchCount = 0;
-
-function msBeginRevealBatch() {
-    msRevealBatchDepth++;
-}
-
-function msEndRevealBatch() {
-    msRevealBatchDepth = Math.max(0, msRevealBatchDepth - 1);
-    if (msRevealBatchDepth === 0) {
-        if (msRevealBatchCount === 1) {
-            playMSAudio('snd-reveal');
-        } else if (msRevealBatchCount > 1) {
-            playMSAudio('snd-cascade');
-        }
-        msRevealBatchCount = 0;
-    }
-}
-
 function revealCell(r, c) {
     if (r < 0 || r >= msRows || c < 0 || c >= msCols) return;
     const cell = msBoard[r][c];
@@ -1265,18 +1154,16 @@ function revealCell(r, c) {
 
     if (cell.mine) {
         playMSAudio('snd-explode'); 
-        el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
-        if (msTextMode) el.classList.add('text-mode');
+        el.innerHTML = 'X';
         el.classList.add('mine');
         gameOver(false);
         return;
     }
 
-    msRevealBatchCount++;
+    playMSAudio('snd-reveal');
 
     if (cell.neighbors > 0) {
         el.innerHTML = cell.neighbors;
-        if (msTextMode) el.classList.add('text-mode');
     } else {
         el.innerHTML = '';
         for (let dr = -1; dr <= 1; dr++) {
@@ -1289,7 +1176,7 @@ function revealCell(r, c) {
 }
 
 function handleMSRightClick(r, c) {
-    if (msGameOver || msIsPaused || msBoard[r][c].revealed) return;
+    if (msGameOver || msIsPaused || msGeneratingBoard || msBoard[r][c].revealed) return;
     
     
     const cell = msBoard[r][c];
@@ -1303,15 +1190,13 @@ function handleMSRightClick(r, c) {
             msFlagsCount++;
             el.classList.remove('flagged');
             el.classList.add('questioned');
-            el.innerHTML = msTextMode ? '?' : '\u2753';
-            if (msTextMode) el.classList.add('text-mode');
+            el.innerHTML = '?';
             playMSAudio('snd-flag');
         } else {
             // Remove flag
             cell.flagged = false;
             msFlagsCount++;
             el.classList.remove('flagged');
-            if (msTextMode) el.classList.add('text-mode');
             el.innerHTML = '';
             playMSAudio('snd-flag');
         }
@@ -1326,8 +1211,7 @@ function handleMSRightClick(r, c) {
         cell.flagged = true;
         msFlagsCount--;
         el.classList.add('flagged');
-        el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
-        if (msTextMode) el.classList.add('text-mode');
+        el.innerHTML = 'F';
         playMSAudio('snd-flag');
     }
 
@@ -1476,8 +1360,8 @@ function gameOver(won) {
     status.innerHTML = `<div>${message}</div>`;
 
     status.className = won
-        ? "font-bold text-center mt-4"
-        : "font-bold text-center mt-4";
+        ? "text-green-600 font-bold text-center mt-4"
+        : "text-red-600 font-bold text-center mt-4";
 
     // reveal everything
     for (let r = 0; r < msRows; r++) {
@@ -1488,112 +1372,24 @@ function gameOver(won) {
 
             if (cell.mine && cell.flagged) {
                 el.classList.add('revealed');
-                el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
-                if (msTextMode) el.classList.add('text-mode');
+                el.innerHTML = 'F';
             }
             else if (cell.mine) {
                 el.classList.add('revealed', 'mine');
-                el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
-                if (msTextMode) el.classList.add('text-mode');
+                el.innerHTML = 'X';
             }
             else if (cell.flagged) {
                 el.classList.add('revealed');
                 if (!cell.mine) {
                     // Incorrect flag - make it red
-                    el.style.color = '#ff7aa8';
-                    el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+                    el.style.color = '#ff0000';
+                    el.innerHTML = 'F';
                 } else {
-                    el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
+                    el.innerHTML = 'F';
                 }
-                if (msTextMode) el.classList.add('text-mode');
             }
         }
     }
-}
-
-/* ============================================
-   Generated sound effects — soft, cheery, lo-fi
-   All synthesized with the Web Audio API, no
-   audio files involved.
-   ============================================ */
-let msAudioCtx = null;
-let msMasterGain = null;
-
-function msGetAudioCtx() {
-    if (!msAudioCtx) {
-        msAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        msMasterGain = msAudioCtx.createGain();
-        msMasterGain.gain.value = msVolume;
-        msMasterGain.connect(msAudioCtx.destination);
-    }
-    if (msAudioCtx.state === 'suspended') msAudioCtx.resume();
-    return msAudioCtx;
-}
-
-// Plays a single soft tone with its own envelope + gentle lowpass warmth.
-function msPlayTone({ freq = 440, type = 'sine', duration = 0.18, delay = 0,
-                       gain = 0.22, glideTo = null, filterFreq = 2600 }) {
-    const ctx = msGetAudioCtx();
-    const t0 = ctx.currentTime + delay;
-
-    const osc = ctx.createOscillator();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (glideTo !== null) {
-        osc.frequency.exponentialRampToValueAtTime(Math.max(glideTo, 1), t0 + duration);
-    }
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = filterFreq;
-    filter.Q.value = 0.7;
-
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0, t0);
-    env.gain.linearRampToValueAtTime(gain, t0 + Math.min(0.015, duration * 0.2));
-    env.gain.exponentialRampToValueAtTime(0.0008, t0 + duration);
-
-    osc.connect(filter);
-    filter.connect(env);
-    env.connect(msMasterGain);
-
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.02);
-}
-
-// A soft breathy "poof" using filtered noise, for the mine reveal.
-function msPlayPoof(delay = 0) {
-    const ctx = msGetAudioCtx();
-    const t0 = ctx.currentTime + delay;
-    const duration = 0.32;
-
-    const bufferSize = Math.ceil(ctx.sampleRate * duration);
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(900, t0);
-    filter.frequency.exponentialRampToValueAtTime(140, t0 + duration);
-    filter.Q.value = 0.6;
-
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0, t0);
-    env.gain.linearRampToValueAtTime(0.16, t0 + 0.02);
-    env.gain.exponentialRampToValueAtTime(0.0008, t0 + duration);
-
-    noise.connect(filter);
-    filter.connect(env);
-    env.connect(msMasterGain);
-    noise.start(t0);
-    noise.stop(t0 + duration + 0.02);
-
-    // a soft low sine underneath for a gentle "boop"
-    msPlayTone({ freq: 220, glideTo: 90, type: 'sine', duration: 0.3, delay, gain: 0.18, filterFreq: 900 });
 }
 
 function playMSAudio(id) {
@@ -1601,77 +1397,40 @@ function playMSAudio(id) {
 
     const soundMap = {
         'snd-reveal': msSoundReveal,
-        'snd-cascade': msSoundReveal,
         'snd-flag': msSoundFlag,
         'snd-explode': msSoundExplode,
         'snd-win': msSoundWin
     };
+
     if (!soundMap[id]) return;
 
-    try {
-        if (id === 'snd-reveal') {
-            // tiny cheerful blip, pitch wobbles a touch for organic feel
-            const freq = 640 + Math.random() * 90;
-            msPlayTone({ freq, type: 'triangle', duration: 0.11, gain: 0.14, filterFreq: 3200 });
-        } else if (id === 'snd-cascade') {
-            // quick airy sparkle for when a big empty patch opens at once,
-            // one sound instead of a pile-up of individual reveal blips
-            const notes = [780, 980, 1220];
-            notes.forEach((f, i) => {
-                msPlayTone({ freq: f, type: 'triangle', duration: 0.13, delay: i * 0.035, gain: 0.11, filterFreq: 4200 });
-            });
-        } else if (id === 'snd-flag') {
-            // two-note pluck, cheerful little fourth going up
-            msPlayTone({ freq: 620, type: 'triangle', duration: 0.09, gain: 0.16, filterFreq: 3000 });
-            msPlayTone({ freq: 820, type: 'triangle', duration: 0.12, delay: 0.06, gain: 0.16, filterFreq: 3000 });
-        } else if (id === 'snd-explode') {
-            // soft "poof" instead of a harsh bang — still reads as a mishap, stays gentle
-            msPlayPoof(0);
-        } else if (id === 'snd-win') {
-            // bright little ascending arpeggio, major triad + octave
-            const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
-            notes.forEach((f, i) => {
-                msPlayTone({ freq: f, type: 'triangle', duration: 0.32, delay: i * 0.09, gain: 0.17, filterFreq: 3800 });
-            });
-        }
-    } catch (e) {
-        // Web Audio unavailable — fail silently, gameplay isn't affected
+    const sound = document.getElementById(id);
+    if (!sound) return;
+
+    // ONLY flag sound overlaps
+    if (id === 'snd-flag') {
+        const clone = sound.cloneNode();
+        clone.volume = msVolume;
+        clone.play();
+        clone.onended = () => clone.remove();
+    } else {
+        // normal behavior for everything else
+        sound.volume = msVolume;
+        sound.currentTime = 0;
+        sound.play().catch(() => {});
     }
 }
 
 function changeVolume(value) {
     msVolume = parseFloat(value);
     localStorage.setItem('msVolume', msVolume);
-    if (msMasterGain) msMasterGain.gain.value = msVolume;
+    // Update all audio elements
+    const audioElements = document.querySelectorAll('audio');
+    audioElements.forEach(audio => {
+        audio.volume = msVolume;
+    });
 }
 
-function toggleTextMode() {
-    msTextMode = document.getElementById('textMode').checked;
-    localStorage.setItem('msTextMode', msTextMode);
-    // Re-render the board to apply the change
-    if (msBoard.length > 0) {
-        for (let r = 0; r < msRows; r++) {
-            for (let c = 0; c < msCols; c++) {
-                const cell = msBoard[r][c];
-                const el = document.getElementById(`ms-${r}-${c}`);
-                if (cell.revealed) {
-                    if (cell.mine) {
-                        el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
-                    } else if (cell.neighbors > 0) {
-                        el.innerHTML = cell.neighbors;
-                    }
-                } else if (cell.flagged) {
-                    el.innerHTML = msTextMode ? 'F' : '\uD83D\uDEA9';
-                }
-                if (msTextMode) {
-                    el.classList.add('text-mode');
-                } else {
-                    el.classList.remove('text-mode');
-                }
-            }
-        }
-    }
-}
 
 
 window.addEventListener('keydown', (e) => {
@@ -1917,7 +1676,7 @@ function updateMineVisibility() {
             
             if (cell.mine && !cell.revealed && msViewMines) {
                 el.style.opacity = '0.3';
-                el.innerHTML = msTextMode ? 'X' : '\uD83D\uDCA3';
+                el.innerHTML = 'X';
             } else if (cell.mine && !cell.revealed && !msViewMines) {
                 el.style.opacity = '1';
                 el.innerHTML = '';
@@ -2049,7 +1808,7 @@ function togglePause() {
         // Pause the game
         msIsPaused = true;
         pauseButton.textContent = 'Paused';
-        pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors';
+        pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors bg-white text-gray-800 hover:bg-gray-100';
         pauseOverlay.style.display = 'flex';
         pauseOverlay.style.opacity = '1';
         pauseIcon.style.display = 'flex';
@@ -2076,7 +1835,7 @@ function togglePause() {
         setTimeout(() => {
             pauseOverlay.style.display = 'none';
             pauseButton.textContent = 'Pause';
-            pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors';
+            pauseButton.className = 'px-3 py-1 rounded text-sm font-semibold transition-colors bg-white text-gray-800 hover:bg-gray-100';
             board.style.opacity = '1';
             board.style.pointerEvents = 'auto';
             
@@ -2123,34 +1882,14 @@ document.addEventListener('visibilitychange', () => {
 // ... (rest of the code remains the same)
 
 
-function msClamp(v, min, max) {
-    return Math.min(Math.max(v, min), max);
-}
-
 function updateMineSuggestion() {
-    const rowsInput = document.getElementById('minesweeper-custom-rows');
-    const colsInput = document.getElementById('minesweeper-custom-cols');
-    const minesInput = document.getElementById('minesweeper-custom-mines');
-
-    let rows = parseInt(rowsInput.value, 10);
-    let cols = parseInt(colsInput.value, 10);
-    rows = isNaN(rows) ? 10 : msClamp(rows, 4, 30);
-    cols = isNaN(cols) ? 10 : msClamp(cols, 4, 30);
-
+    const rows = parseInt(document.getElementById('minesweeper-custom-rows').value) || 10;
+    const cols = parseInt(document.getElementById('minesweeper-custom-cols').value) || 10;
+    const currentMines = parseInt(document.getElementById('minesweeper-custom-mines').value) || 1;
+    
     const totalCells = rows * cols;
-    const maxMines = Math.max(1, Math.floor(totalCells * 0.8)); // Cap at 80% for playability
-
-    const rawMines = parseInt(minesInput.value, 10);
-    // Use a clamped value for every calculation below, so the suggestion
-    // text always reflects a mine count that's actually usable — the raw
-    // out-of-range number never leaks into the math.
-    const currentMines = isNaN(rawMines) ? 1 : msClamp(rawMines, 1, maxMines);
-
-    // Flag the field itself while the raw typed value is out of range,
-    // it gets hard-snapped back on blur via clampMineInputs().
-    const outOfRange = !isNaN(rawMines) && (rawMines < 1 || rawMines > maxMines);
-    minesInput.classList.toggle('out-of-range', outOfRange);
-
+    const maxMines = Math.floor(totalCells * 0.8); // Cap at 80% for playability
+    
     // Calculate suggestion based on standard difficulties
     let suggestedMines;
     if (rows === 8 && cols === 8) {
@@ -2185,11 +1924,8 @@ function updateMineSuggestion() {
     
     let suggestionText = `Suggested: ${suggestedMines} mines (${suggestedDensity}% density)`;
     
-    if (outOfRange && rawMines > maxMines) {
+    if (currentMines > maxMines) {
         suggestionText += ` | Too many! Max: ${maxMines}`;
-        suggestionEl.style.color = '#ff6b6b';
-    } else if (outOfRange && rawMines < 1) {
-        suggestionText += ` | Too few! Min: 1`;
         suggestionEl.style.color = '#ff6b6b';
     } else if (currentMines > suggestedMines * 1.5) {
         suggestionText += ` | ${currentDensity}% (Hard)`;
@@ -2208,41 +1944,18 @@ function updateMineSuggestion() {
     suggestionEl.textContent = suggestionText;
 }
 
-// Hard-snaps rows/cols/mines back into valid ranges once the user leaves
-// a field, so an out-of-range number never sticks around unresolved.
-function clampMineInputs() {
-    const rowsInput = document.getElementById('minesweeper-custom-rows');
-    const colsInput = document.getElementById('minesweeper-custom-cols');
-    const minesInput = document.getElementById('minesweeper-custom-mines');
-
-    let rows = parseInt(rowsInput.value, 10);
-    let cols = parseInt(colsInput.value, 10);
-    rows = isNaN(rows) ? 10 : msClamp(rows, 4, 30);
-    cols = isNaN(cols) ? 10 : msClamp(cols, 4, 30);
-    rowsInput.value = rows;
-    colsInput.value = cols;
-
-    const maxMines = Math.max(1, Math.floor(rows * cols * 0.8));
-    let mines = parseInt(minesInput.value, 10);
-    mines = isNaN(mines) ? Math.floor(rows * cols * 0.12) : msClamp(mines, 1, maxMines);
-    minesInput.value = mines;
-    minesInput.classList.remove('out-of-range');
-
-    updateMineSuggestion();
-}
-
 </script>
 
-    <main class="container mx-auto mt-6 p-4" style="max-width: 640px;">
-        <section id="minesweeper" class="p-6 rounded-xl" style="background-color: var(--card-bg); border: 1px solid var(--input-border); box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 0 50px rgba(120,90,220,0.04);">
+    <main class="container mx-auto mt-8 p-4">
+        <section id="minesweeper" class="p-6 rounded-xl shadow-md" style="background-color: var(--card-bg);">
             <div class="flex justify-between items-center mb-4 relative">
                 <div>
-                    <h2 class="text-xl font-bold mb-2" style="color: var(--purple); letter-spacing: 0.06em; text-shadow: 0 0 14px var(--purple-glow);">minesweeper</h2>
-                    <div class="text-sm" style="color: var(--text-dim);">score <span id="minesweeper-total-score" class="font-bold" style="color: var(--text-color);">0</span></div>
+                    <h2 class="text-xl font-bold mb-2">Minesweeper</h2>
+                    <div class="text-sm" style="color: var(--text-color); opacity: 0.7;">Total Score: <span id="minesweeper-total-score" class="font-bold">0</span></div>
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="loading-spinner" id="loadingSpinner"></div>
-                    <button id="pauseButton" onclick="togglePause()" class="px-3 py-1 rounded text-sm font-semibold transition-colors" style="display: none; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border);">Pause</button>
+                    <button id="pauseButton" onclick="togglePause()" class="px-3 py-1 rounded text-sm font-semibold transition-colors bg-white text-gray-800 hover:bg-gray-100" style="display: none;">Pause</button>
                 </div>
             </div>
             <div id="testModeIndicator" style="position: absolute; top: 10px; right: 10px; color: #ff9900; font-weight: bold; opacity: 0.5; pointer-events: none; display: none;">TEST MODE</div>
@@ -2262,26 +1975,26 @@ function clampMineInputs() {
                 </div>
             </div>
                         <div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-4">
-                <select id="minesweeper-difficulty" onchange="toggleCustomMinesweeper()" class="border p-2 rounded w-full md:w-auto" style="background-color: var(--input-bg); color: var(--text-color); border-color: var(--input-border); font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+                <select id="minesweeper-difficulty" onchange="toggleCustomMinesweeper()" class="border p-2 rounded w-full md:w-auto" style="background-color: var(--input-bg); color: var(--text-color); border-color: var(--input-border);">
                     <option value="easy">8x8 (10 mines)</option>
                     <option value="medium">12x12 (20 mines)</option>
                     <option value="hard">16x16 (40 mines)</option>
                     <option value="custom">Custom</option>
                 </select>
-                <button onclick="startMinesweeper()" class="px-6 py-2 rounded font-semibold transition-colors" id="newGameBtn" style="background-color: var(--purple-dim); color: white; border: 1px solid var(--purple-dim); font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.04em;" onmouseover="this.style.boxShadow='0 0 20px var(--purple-glow)'" onmouseout="this.style.boxShadow='none'">new game</button>
+                <button onclick="startMinesweeper()" class="px-6 py-2 rounded font-semibold transition-colors" style="background-color: var(--button-bg); color: white;">New Game</button>
             </div>
             <div id="minesweeper-custom-panel" class="flex flex-col md:flex-row justify-center items-center gap-4 mb-2" style="display:none;">
                 <div class="flex flex-col">
                     <label class="text-sm mb-1" for="minesweeper-custom-rows" style="color: var(--text-color);">Rows</label>
-                    <input id="minesweeper-custom-rows" type="number" min="4" max="30" value="10" class="ms-custom-input rounded w-20" oninput="updateMineSuggestion()" onblur="clampMineInputs()">
+                    <input id="minesweeper-custom-rows" type="number" min="4" max="30" value="10" class="border p-2 rounded w-20" style="background-color: var(--input-bg); color: var(--text-color); border-color: var(--input-border);" oninput="updateMineSuggestion()">
                 </div>
                 <div class="flex flex-col">
                     <label class="text-sm mb-1" for="minesweeper-custom-cols" style="color: var(--text-color);">Cols</label>
-                    <input id="minesweeper-custom-cols" type="number" min="4" max="30" value="10" class="ms-custom-input rounded w-20" oninput="updateMineSuggestion()" onblur="clampMineInputs()">
+                    <input id="minesweeper-custom-cols" type="number" min="4" max="30" value="10" class="border p-2 rounded w-20" style="background-color: var(--input-bg); color: var(--text-color); border-color: var(--input-border);" oninput="updateMineSuggestion()">
                 </div>
                 <div class="flex flex-col">
                     <label class="text-sm mb-1" for="minesweeper-custom-mines" style="color: var(--text-color);">Mines</label>
-                    <input id="minesweeper-custom-mines" type="number" min="1" value="12" class="ms-custom-input rounded w-20" oninput="updateMineSuggestion()" onblur="clampMineInputs()">
+                    <input id="minesweeper-custom-mines" type="number" min="1" value="12" class="border p-2 rounded w-20" style="background-color: var(--input-bg); color: var(--text-color); border-color: var(--input-border);" oninput="updateMineSuggestion()">
                 </div>
             </div>
             <div id="mine-suggestion-container" class="text-center mb-4" style="display:none;">
@@ -2291,23 +2004,40 @@ function clampMineInputs() {
                 <div id="minesweeper-board" class="inline-grid"></div>
             </div>
             <div class="grid grid-cols-2 gap-4 text-center max-w-xs mx-auto" id="stats-grid">
-                <div class="p-3 rounded" style="background-color: var(--input-bg); border: 1px solid var(--input-border);">
-                    <div class="text-xl font-bold" style="color: var(--danger);" id="minesweeper-flags">0</div>
-                    <div class="text-xs uppercase" style="opacity: 0.6; letter-spacing: 0.06em; color: var(--text-dim);">flags</div>
+                <div class="p-3 rounded" style="background-color: var(--input-bg);">
+                    <div class="text-xl font-bold text-red-600" id="minesweeper-flags">0</div>
+                    <div class="text-xs uppercase" style="opacity: 0.7;">Flags</div>
                 </div>
-                <div class="p-3 rounded" id="timer-container" style="background-color: var(--input-bg); border: 1px solid var(--input-border);">
-                    <div class="text-xl font-bold" style="color: var(--purple);" id="minesweeper-timer">0</div>
-                    <div class="text-xs uppercase" style="opacity: 0.6; letter-spacing: 0.06em; color: var(--text-dim);">time</div>
+                <div class="p-3 rounded" id="timer-container" style="background-color: var(--input-bg);">
+                    <div class="text-xl font-bold text-blue-600" id="minesweeper-timer">0</div>
+                    <div class="text-xs uppercase" style="opacity: 0.7;">Time</div>
                 </div>
             </div>
             <div id="minesweeper-status" class="text-center mt-4 font-bold text-lg h-8"></div>
-            <div class="mt-6 pt-4 text-center" style="border-top: 1px solid var(--input-border);">
-                <div style="color: var(--text-dim); font-size: 11px; letter-spacing: 0.03em; opacity: 0.55;">
-                    best &nbsp;easy <span id="best-easy">--</span> &nbsp;·&nbsp; medium <span id="best-medium">--</span> &nbsp;·&nbsp; hard <span id="best-hard">--</span>
+            <div class="mt-6 pt-3 text-center" style="border-top: 1px solid var(--input-border); opacity: 0.6;">
+                <p class="text-xs uppercase tracking-wide mb-1" style="opacity: 0.7;">Best Times</p>
+                <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                        <span style="opacity: 0.7;">Easy</span>
+                        <p id="best-easy" class="font-mono">--</p>
+                    </div>
+                    <div>
+                        <span style="opacity: 0.7;">Medium</span>
+                        <p id="best-medium" class="font-mono">--</p>
+                    </div>
+                    <div>
+                        <span style="opacity: 0.7;">Hard</span>
+                        <p id="best-hard" class="font-mono">--</p>
+                    </div>
                 </div>
             </div>
         </section>
     </main>
 
+    <!-- Audio elements for sounds -->
+    <audio id="snd-reveal" src="reveal.mp3" preload="auto"></audio>
+    <audio id="snd-flag" src="flagplace.mp3" preload="auto"></audio>
+    <audio id="snd-explode" src="explode.mp3" preload="auto"></audio>
+    <audio id="snd-win" src="win.mp3" preload="auto"></audio>
 </body>
 </html>
